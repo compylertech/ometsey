@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+/* Tokens taken from the reference theme: Montserrat throughout, warm off-white page, black text. */
+@theme {
+  --font-sans: "Montserrat", sans-serif;
+  --color-paper: #fffef8;
+  --color-ink: #000;
+  --color-line: #e1e1e1;
+  --color-brand: #76410f;
+}
+
+/* Base styles sit in the base layer so Tailwind utilities (e.g. border on a button) can override them. */
+@layer base {
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    color: #000;
+    background: var(--color-paper);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  button { cursor: pointer; font: inherit; color: inherit; background: none; border: 0; padding: 0; }
+}
+
+/* Small uppercase labels used for nav, titles, prices and links. */
+.label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
+.label-wide { font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; }
+.ulink { border-bottom: 1px solid currentColor; padding-bottom: 2px; }
+.btn-black {
+  display: inline-block; background: #000; color: #fff; padding: 14px 34px;
+  font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; transition: opacity .2s;
+}
+.btn-black:hover { opacity: .8; }
+.btn-outline {
+  display: inline-block; border: 1px solid #000; padding: 14px 34px;
+  font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; transition: background .2s, color .2s;
+}
+.btn-outline:hover { background: #000; color: #fff; }
+.rail { scrollbar-width: none; }
+.rail::-webkit-scrollbar { display: none; }

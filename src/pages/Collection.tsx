@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link, useParams, useSearchParams } from "react-router-dom"
 import { CATEGORIES, COLLECTION_TITLES, COLOR_SWATCH, SIZES, colorOf, productsFor } from "@/data/catalog"
+import { useProducts } from "@/store/catalog"
 import { ProductCard } from "@/components/ProductCard"
 import { CloseIcon } from "@/components/Icons"
 
@@ -42,7 +43,8 @@ export function Collection() {
 }
 
 function CollectionPage({ handle }: { handle: string }) {
-    const base = useMemo(() => productsFor(handle), [handle]);
+    const catalog = useProducts();
+    const base = useMemo(() => productsFor(catalog, handle), [catalog, handle]);
     const prices = base.map((p) => p.price);
     const lo = Math.min(...prices, 0), hi = Math.max(...prices, 0);
 
@@ -64,7 +66,7 @@ function CollectionPage({ handle }: { handle: string }) {
     const stockOk = !stock.length || stock.includes("In stock");
     const items = (stockOk ? base : [])
         .filter((p) => !cats.length || cats.includes(p.category))
-        .filter((p) => !colors.length || colors.includes(colorOf(p.handle) ?? ""))
+        .filter((p) => !colors.length || colors.includes(colorOf(p) ?? ""))
         .filter((p) => p.price >= pmin && p.price <= pmax);
     if (sort === "low") items.sort((a, b) => a.price - b.price);
     if (sort === "high") items.sort((a, b) => b.price - a.price);
@@ -88,7 +90,7 @@ function CollectionPage({ handle }: { handle: string }) {
         setParams({}, { replace: true });
     }, [sig, setParams]);
 
-    const colorChoices = [...new Set(base.map((p) => colorOf(p.handle)).filter((c): c is string => !!c))].sort();
+    const colorChoices = [...new Set(base.map((p) => colorOf(p)).filter((c): c is string => !!c))].sort();
     const catChoices = [...new Set(base.map((p) => p.category))];
     const dirty = stock.length + cats.length + colors.length + sizes.length > 0 || min !== null || max !== null;
     const clear = () => { setStock([]); setCats([]); setColors([]); setSizes([]); setMin(null); setMax(null); };

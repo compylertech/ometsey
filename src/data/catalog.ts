@@ -29,22 +29,6 @@ export const NAV: NavItem[] = [
         ],
     },
     { label: "Gift Card", to: "/pages/gift-card" },
-    {
-        label: "About", to: "/pages/about-us",
-        links: [
-            { label: "About Us", to: "/pages/about-us" },
-            { label: "Book An Appointment", to: "/pages/book-an-appointment" },
-            { label: "FAQs", to: "/pages/faq" },
-            { label: "Store Location", to: "/pages/store-location" },
-        ],
-    },
-    {
-        label: "Bespoke", to: "/pages/gallery",
-        links: [
-            { label: "Gallery", to: "/pages/gallery" },
-            { label: "Contact Us", to: "/pages/contact-us" },
-        ],
-    },
 ];
 
 /** Utility links the live header carries beside the cart. */
@@ -70,9 +54,10 @@ export const CATEGORIES: NavLink[] = [
 export const FOOTER_GROUPS: { heading: string; links: NavLink[] }[] = [
     { heading: "About Ometsey", links: [
         { label: "About Us", to: "/pages/about-us" },
-        { label: "The Bespoke Process", to: "/pages/gallery" },
         { label: "Book An Appointment", to: "/pages/book-an-appointment" },
         { label: "FAQs", to: "/pages/faq" },
+        { label: "Store Location", to: "/pages/store-location" },
+        { label: "Gallery", to: "/pages/gallery" },
         { label: "Blog", to: "/pages/blog" },
         { label: "Contact Us", to: "/pages/contact-us" },
     ] },
@@ -92,6 +77,18 @@ export const STORE = {
     email: "sales@ometsey.com",
 };
 
+/** Details the Store Location page lists for the headquarters; they differ from the Contact page's. */
+export const STORE_HQ = {
+    phone: "+233 546-617-617",
+    address: ["Ometsey", "JRRR+V7W American House", "1 Pawpaw St, Accra", "Ghana"],
+    mapQuery: "Ometsey American House 1 Pawpaw St Accra Ghana",
+};
+
+export const HOURS = [
+    { days: "Tuesday – Saturday", hours: "9am – 7pm" },
+    { days: "Monday & Sunday", hours: "Closed" },
+];
+
 export interface Product {
     handle: string;
     title: string;
@@ -104,6 +101,10 @@ export interface Product {
     collections: string[];
     /** Front shot first, then the hover shot, as served from public/images/products. */
     images: string[];
+    /** Set from the admin to take a product off the storefront without deleting it. */
+    hidden?: boolean;
+    /** Colour for the colour filter; falls back to the lookup below for the original products. */
+    color?: string;
     description: string;
 }
 
@@ -189,7 +190,8 @@ const COLLECTION_MEMBERS: Record<string, string[]> = {
     "shannon": ["refined-basics-ii"],
 };
 
-export const PRODUCTS: Product[] = RAW_PRODUCTS.map((p) => ({
+/** The catalog as shipped in code. The storefront and admin read the merged list from store/catalog.ts. */
+export const BASE_PRODUCTS: Product[] = RAW_PRODUCTS.map((p) => ({
     ...p,
     collections: COLLECTION_MEMBERS[p.handle] ?? [],
     images: imagesFor(p.handle),
@@ -205,9 +207,9 @@ export const COLLECTION_TITLES: Record<string, string> = {
     "two-piece": "Two Piece", sets: "Sets", pants: "Pants", accessories: "Accessories",
 };
 
-export function productsFor(handle: string): Product[] {
-    if (handle === "all") return PRODUCTS;
-    return PRODUCTS.filter((p) => p.collections.includes(handle) || p.category === handle || p.tags.includes(handle));
+export function productsFor(products: Product[], handle: string): Product[] {
+    if (handle === "all") return products;
+    return products.filter((p) => p.collections.includes(handle) || p.category === handle || p.tags.includes(handle));
 }
 
 /** Ometsey prices in Ghana cedis. */
@@ -248,4 +250,4 @@ const COLOR_OF: Record<string, string> = {
     "mirekua-black": "Black", "mirekua-olive": "Olive", "rena-black": "Black", "riwah-black": "Black", "ivy-black": "Black",
     "rena-beige": "Beige", "ivy-sage": "Sage", "ohemaa-mustard": "Mustard",
 };
-export const colorOf = (handle: string): string | undefined => COLOR_OF[handle];
+export const colorOf = (p: Pick<Product, "handle" | "color">): string | undefined => p.color || COLOR_OF[p.handle];

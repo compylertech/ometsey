@@ -1,24 +1,28 @@
 import { useState } from "react"
 import { Link, useParams } from "react-router-dom"
-import { PRODUCTS, SIZES, money } from "@/data/catalog"
+import { SIZES, money } from "@/data/catalog"
+import { useProducts } from "@/store/catalog"
 import { ProductCard } from "@/components/ProductCard"
 import { useCart } from "@/store/cart"
+import { useWishlist } from "@/store/wishlist"
 
 
 export function Product() {
     const { handle } = useParams();
-    const product = PRODUCTS.find((p) => p.handle === handle);
+    const products = useProducts();
+    const product = products.find((p) => p.handle === handle);
     const [size, setSize] = useState("");
     const add = useCart((s) => s.add);
+    const { handles, toggle } = useWishlist();
 
     if (!product) return <p className="py-32 text-center">Product not found. <Link to="/collections/all" className="underline">Shop all</Link></p>;
-    const related = PRODUCTS.filter((p) => p.category === product.category && p.handle !== product.handle).slice(0, 4);
+    const related = products.filter((p) => p.category === product.category && p.handle !== product.handle).slice(0, 4);
 
     return (
         <>
             <section className="mx-auto grid gap-10 px-5 py-10 lg:grid-cols-[1.4fr_1fr] lg:px-10">
                 <div className="grid grid-cols-2 gap-3">
-                    {product.images.map((src) => (
+                    {[...new Set(product.images)].map((src) => (
                         <img key={src} src={src} alt={product.title} className="aspect-[5/7] w-full object-cover" />
                     ))}
                 </div>
@@ -35,6 +39,9 @@ export function Product() {
                     </div>
                     <button disabled={!size} onClick={() => add(product.handle, size)} className="btn-black mt-8 w-full disabled:opacity-40">
                         {size ? "Add to Bag" : "Select a size"}
+                    </button>
+                    <button onClick={() => toggle(product.handle)} className="mt-3 w-full border border-black/25 py-3 text-[12px] uppercase tracking-[0.15em]">
+                        {handles.includes(product.handle) ? "Saved to wishlist" : "Add to wishlist"}
                     </button>
                     <p className="mt-4 text-xs text-black/60">Worldwide shipping. Made to order in Accra.</p>
                 </div>

@@ -1,11 +1,15 @@
+import { useState } from "react"
 import { Link } from "react-router-dom"
-import { PRODUCTS, money } from "@/data/catalog"
+import { money } from "@/data/catalog"
+import { useProducts } from "@/store/catalog"
 import { useCart } from "@/store/cart"
 
 export function CartDrawer() {
     const { lines, open, setOpen, remove } = useCart();
+    const products = useProducts();
+    const [notice, setNotice] = useState(false);
     const rows = lines.flatMap((l) => {
-        const product = PRODUCTS.find((p) => p.handle === l.handle);
+        const product = products.find((p) => p.handle === l.handle);
         return product ? [{ ...l, product }] : [];
     });
     const subtotal = rows.reduce((n, r) => n + r.product.price * r.qty, 0);
@@ -41,7 +45,9 @@ export function CartDrawer() {
                 <div className="border-t border-line p-5">
                     <div className="label flex justify-between"><span>Subtotal</span><span>{money(subtotal)}</span></div>
                     <p className="mt-2 text-xs text-black/60">Taxes and shipping calculated at checkout.</p>
-                    <button disabled={!rows.length} className="btn-black mt-4 w-full disabled:opacity-40">Checkout</button>
+                    <button disabled={!rows.length} onClick={() => setNotice(true)} className="btn-black mt-4 w-full disabled:opacity-40">Checkout</button>
+                    {notice && <p className="mt-3 text-[12px] leading-5 text-black/60">Checkout isn’t connected to payments yet.</p>}
+                    <Link to="/cart" onClick={() => setOpen(false)} className="btn-outline mt-3 block w-full text-center">View Shopping Bag</Link>
                 </div>
             </aside>
         </>

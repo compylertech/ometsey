@@ -41,3 +41,28 @@
 .btn-outline:hover { background: #000; color: #fff; }
 .rail { scrollbar-width: none; }
 .rail::-webkit-scrollbar { display: none; }
+
+/* Admin themes. Everything in src/admin reads these variables, so a theme is just a set of values.
+   Black & white is the default; "brand" restores the storefront's brown. */
+.admin {
+  --a-accent: #000; --a-accent-hover: #2b2b2b;
+  --a-bg: #f6f6f6; --a-surface-alt: #fff; --a-subtle: #fafafa;
+  --a-border: #e4e4e4; --a-border-soft: #eeeeee;
+  --a-side: #0a0a0a; --a-side-accent: #fff;
+  --a-logo-on-dark: brightness(0) invert(1); --a-logo-on-light: brightness(0);
+  --a-warn-bg: #f4f4f4; --a-warn-border: #d4d4d4; --a-warn-ink: #111;
+  /* Status and trend colours carry meaning, so they stay colour-coded in every theme. */
+  --a-up: #047857; --a-down: #b91c1c;
+  --a-st-pay: #c98a14; --a-st-ful: #2f6f9f; --a-st-done: #3f8a5a; --a-st-can: #b91c1c;
+}
+.admin[data-admin-theme="brand"] {
+  --a-accent: #76410f; --a-accent-hover: #5e3309;
+  --a-bg: #f5f2ea; --a-surface-alt: #fbf9f4; --a-subtle: #faf8f3;
+  --a-border: #e8e2d6; --a-border-soft: #efe9dd;
+  --a-side: #1b1410; --a-side-accent: #e0a96a;
+  --a-logo-on-dark: none; --a-logo-on-light: none;
+  --a-warn-bg: #fffbeb; --a-warn-border: #fde68a; --a-warn-ink: #451a03;
+}
+
+/* Admin tables: a quiet row hover so long lists stay scannable. */
+.admin tbody tr:hover { background: var(--a-subtle); }

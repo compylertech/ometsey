@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
-import { ACCOUNT_LINKS, NAV, PROMO, PRODUCTS, money } from "@/data/catalog"
+import { ACCOUNT_LINKS, NAV, PROMO, money } from "@/data/catalog"
+import { useProducts } from "@/store/catalog"
 import { useCart } from "@/store/cart"
 import { BagIcon, CloseIcon, MenuIcon, SearchIcon, UserIcon } from "./Icons"
 
@@ -20,7 +21,7 @@ function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
     return (
         <>
             <div onClick={onClose} className={`fixed inset-0 z-50 bg-black/40 transition ${open ? "visible opacity-100" : "invisible opacity-0"}`} />
-            <aside className={`fixed left-0 top-0 z-50 h-full w-full max-w-[420px] overflow-y-auto bg-paper px-8 py-6 transition-transform duration-300 ${open ? "translate-x-0" : "-translate-x-full"}`}>
+            <aside className={`fixed left-0 top-0 z-50 flex h-full w-full max-w-[420px] flex-col overflow-y-auto bg-paper px-8 py-6 transition-transform duration-300 ${open ? "translate-x-0" : "-translate-x-full"}`}>
                 <button aria-label="Close menu" onClick={onClose} className="mb-8"><CloseIcon /></button>
                 <ul>
                     {NAV.map((item) => (
@@ -32,7 +33,7 @@ function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                         </li>
                     ))}
                 </ul>
-                <div className="label mt-8 flex flex-wrap gap-6">
+                <div className="label mt-auto flex flex-wrap gap-6 border-t border-line pt-6">
                     {ACCOUNT_LINKS.map((l) => <Link key={l.to} to={l.to} onClick={onClose}>{l.label}</Link>)}
                 </div>
             </aside>
@@ -42,7 +43,8 @@ function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 function Search({ onClose }: { onClose: () => void }) {
     const [q, setQ] = useState("");
-    const hits = q.trim() ? PRODUCTS.filter((p) => p.title.toLowerCase().includes(q.toLowerCase())) : [];
+    const products = useProducts();
+    const hits = q.trim() ? products.filter((p) => p.title.toLowerCase().includes(q.toLowerCase())) : [];
     return (
         <div className="fixed inset-0 z-50 bg-paper p-6 md:p-12">
             <button aria-label="Close search" onClick={onClose} className="absolute right-6 top-6"><CloseIcon /></button>

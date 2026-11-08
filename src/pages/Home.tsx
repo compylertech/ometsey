@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
-import { BEST_SELLERS, COLLECTION_TILES, HERO_SLIDES, PRODUCTS } from "@/data/catalog"
+import { BEST_SELLERS, COLLECTION_TILES, HERO_SLIDES } from "@/data/catalog"
+import { useProducts } from "@/store/catalog"
 import { ProductCard } from "@/components/ProductCard"
 
 function Hero() {
@@ -48,7 +49,8 @@ function Tiles({ title, items }: { title: string; items: { title: string; to: st
 }
 
 export function Home() {
-    const arrivals = PRODUCTS.filter((p) => p.tags.includes("new-in")).slice(0, 4);
+    const products = useProducts();
+    const arrivals = products.filter((p) => p.tags.includes("new-in")).slice(0, 4);
     return (
         <>
             <Hero />
@@ -82,7 +84,7 @@ export function Home() {
 
             {/* Social strip */}
             <section className="rail flex gap-1 overflow-x-auto">
-                {PRODUCTS.map((p) => <img key={p.handle} src={p.images[0]} alt="" loading="lazy" className="aspect-square w-60 shrink-0 object-cover" />)}
+                {products.map((p) => <img key={p.handle} src={p.images[0]} alt="" loading="lazy" className="aspect-square w-60 shrink-0 object-cover" />)}
             </section>
         </>
     )

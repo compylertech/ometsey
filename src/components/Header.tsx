@@ -1,7 +1,9 @@
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
-import { ACCOUNT_LINKS, NAV, PROMO, money } from "@/data/catalog"
+import { ACCOUNT_LINKS, NAV, PROMO } from "@/data/catalog"
 import { useProducts } from "@/store/catalog"
+import { useMoney } from "@/store/market"
+import { CurrencySelect } from "./CurrencySelect"
 import { useCart } from "@/store/cart"
 import { BagIcon, CloseIcon, MenuIcon, SearchIcon, UserIcon } from "./Icons"
 
@@ -33,8 +35,11 @@ function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                         </li>
                     ))}
                 </ul>
-                <div className="label mt-auto flex flex-wrap gap-6 border-t border-line pt-6">
+                <div className="mt-auto">
+                    <div className="flex items-center justify-between border-t border-line pt-5 text-[13px]"><span className="label text-black/50">Currency</span><CurrencySelect /></div>
+                                    <div className="label mt-5 flex flex-wrap gap-6 border-t border-line pt-5">
                     {ACCOUNT_LINKS.map((l) => <Link key={l.to} to={l.to} onClick={onClose}>{l.label}</Link>)}
+                </div>
                 </div>
             </aside>
         </>
@@ -44,6 +49,7 @@ function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
 function Search({ onClose }: { onClose: () => void }) {
     const [q, setQ] = useState("");
     const products = useProducts();
+    const { fmtProduct } = useMoney();
     const hits = q.trim() ? products.filter((p) => p.title.toLowerCase().includes(q.toLowerCase())) : [];
     return (
         <div className="fixed inset-0 z-50 bg-paper p-6 md:p-12">
@@ -59,7 +65,7 @@ function Search({ onClose }: { onClose: () => void }) {
                 )}
                 {hits.map((p) => (
                     <Link key={p.handle} to={`/products/${p.handle}`} onClick={onClose} className="label flex justify-between border-b border-line py-3">
-                        <span>{p.title}</span><span>{money(p.price)}</span>
+                        <span>{p.title}</span><span>{fmtProduct(p)}</span>
                     </Link>
                 ))}
                 {q.trim() && !hits.length && <p className="text-sm text-black/60">No results for “{q}”.</p>}
@@ -86,7 +92,7 @@ export function Header() {
                     <button aria-label="Open menu" onClick={() => setMenu(true)}><MenuIcon /></button>
                     <Link to="/" aria-label="Ometsey" className="absolute left-1/2 top-3 -translate-x-1/2"><img src="/images/brand/logo.png" alt="Ometsey" className="h-14 w-auto" /></Link>
                     <div className="flex items-start gap-8">
-                        <span className="hidden pt-0.5 text-[13px] lg:inline">Ghana Cedi (GHS ₵)</span>
+                        <CurrencySelect className="hidden pt-0.5 lg:block" />
                         <div className="flex flex-col items-center gap-3">
                             <button aria-label="Search" onClick={() => setSearch(true)}><SearchIcon /></button>
                             <Link aria-label="Account" to="/pages/my-account"><UserIcon /></Link>

@@ -1,191 +1,196 @@
-import { useMemo, useState } from "react"
-import { Link } from "react-router-dom"
-import { SIZES, money } from "@/data/catalog"
-import { useProducts } from "@/store/catalog"
-import { usePaged, useSort } from "../hooks"
-import { orderSubtotal, orderTotal } from "../email"
-import { useAdmin } from "../store"
-import type { NewOrder, Order, OrderItem, OrderSource, OrderStatus } from "../types"
-import { Card, Drawer, Empty, FilterField, OrderBadge, PageHead, Pagination, SortTh, Tabs, Td, btn, btnSolid, fmtDate, fmtDateTime, inputCls, linkBtn, ORDER_LABEL } from "../ui"
+// global imports
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 
-const TABS: ("ALL" | OrderStatus)[] = ["ALL", "AWAITING_PAYMENT", "AWAITING_FULFILMENT", "COMPLETED", "CANCELLED"];
-const SOURCES: OrderSource[] = ["website", "whatsapp", "in-store", "bespoke"];
+// local imports
+import { formatMoney } from "../shared";
+import { useAdminData } from "../data";
+import { ADMIN, SOURCE_LABEL, STAGES, csvOf, placedTime, sourceLabel, sourceOf, stageOf } from "../model";
+import type { OrderStage } from "../model";
+import { usePaged, useSort } from "../hooks";
+import { Card, Drawer, Empty, FilterField, PageHead, Pagination, STAGE_LABEL, SortTh, OrderBadge, Tabs, Td, btn, fmtDate, fmtDateTime, inputBare, linkBtn, btnSolid } from "../ui";
+import type { AdminOrder } from "../types";
+import { DataNotices } from "./notices";
+import { NewOrder } from "./NewOrder";
+import { useOrderActions } from "./OrderActions";
 
-function OrderDetail({ order }: { order: Order | undefined }) {
-    const { markPaid, markShipped, cancelOrder } = useAdmin();
-    const [tracking, setTracking] = useState("");
-    if (!order) return null;
+const TABS: ("ALL" | OrderStage)[] = ["ALL", ...STAGES];
+const orderNo = (o: AdminOrder) => Number(o.orderNumber.replace(/\D/g, "")) || 0;
+
+const shipLines = (o: AdminOrder) => [
+    o.shipToName,
+    o.shipToPhone,
+    [o.shipToAddress, o.shipToAddress2].filter(Boolean).join(", "),
+    [o.shipToCity, o.shipToRegion, o.shipToPostalCode, o.shipToCountry].filter(Boolean).join(", "),
+].filter(Boolean) as string[];
+
+/** Where each ready-made email lands in the composer, pre-filled from the order. */
+function composeLink(o: AdminOrder, group?: string) {
+    const q = new URLSearchParams();
+    if (o.customerEmail) q.set("to", o.customerEmail);
+    const first = (o.customerName ?? "").trim().split(/\s+/)[0];
+    if (first) q.set("name", first);
+    const colourway = o.items.find((i) => i.colourway)?.colourway;
+    if (colourway) q.set("colourway", colourway);
+    if (group) q.set("group", group);
+    return `${ADMIN}/emails?${q.toString()}`;
+}
+
+/** The server's payment status, worded for an admin. Only meaningful to call out while the order is unpaid. */
+const PAYMENT_LABEL: Record<string, string> = { PENDING: "Payment pending", FAILED: "Payment failed" };
+const unpaidNote = (o: AdminOrder) => (!o.paid && o.paymentStatus ? PAYMENT_LABEL[o.paymentStatus] ?? null : null);
+
+function OrderDetail({ order }: { order: AdminOrder }) {
+    const actions = useOrderActions(order);
+    const stage = stageOf(order);
+    const ship = shipLines(order);
+    const money = (n: number) => formatMoney(n, order.currency);
     return (
         <div className="space-y-6 text-[13px]">
-            <div className="flex items-center justify-between"><OrderBadge status={order.status} /><span className="text-black/50">{fmtDateTime(order.placedAt)} · {order.source}</span></div>
+            <div>
+                <div className="flex items-center justify-between gap-3"><OrderBadge order={order} />{actions.buttons}</div>
+                <p className="m-0 mt-2 text-black/50">{fmtDateTime(order.placedAt)}{sourceOf(order) !== "storefront" ? ` · ${sourceLabel(order)}` : ""}</p>
+            </div>
+            {order.clientId && <div><Link to={`${ADMIN}/customers?customer=${encodeURIComponent(order.clientId)}`} className="a-link">View customer</Link></div>}
+            {actions.top}
+            {unpaidNote(order) && (
+                <div className={`border px-3 py-2 ${order.paymentStatus === "FAILED" ? "border-[var(--a-st-can)] text-[var(--a-st-can)]" : "border-[var(--a-border)] text-black/60"}`}>
+                    {unpaidNote(order)}{order.paymentStatus === "FAILED" ? ": the payment attempt did not go through. The customer may need a nudge to retry." : ": checkout was started but not completed."}
+                </div>
+            )}
             <section>
-                <p className="mb-1 text-[11px] uppercase tracking-[0.08em] text-black/50">Customer</p>
-                <p>{order.customer.name}</p>
-                <p className="text-black/60">{[order.customer.email, order.customer.phone].filter(Boolean).join(" · ")}</p>
-                <p className="mt-1 text-black/60">{order.shipTo}</p>
+                <p className="m-0 mb-1 text-[11px] uppercase tracking-[0.08em] text-black/50">Customer</p>
+                <p className="m-0">{order.customerName || "—"}</p>
+                <p className="m-0 text-black/60">{[order.customerEmail, order.customerPhone].filter(Boolean).join(" · ")}</p>
             </section>
             <section>
-                <p className="mb-2 text-[11px] uppercase tracking-[0.08em] text-black/50">Items</p>
+                <p className="m-0 mb-1 text-[11px] uppercase tracking-[0.08em] text-black/50">Ship to</p>
+                {ship.length ? ship.map((l, i) => <p key={i} className={`m-0 ${i ? "text-black/60" : ""}`}>{l}</p>) : <p className="m-0 text-black/60">—</p>}
+            </section>
+            <section>
+                <p className="m-0 mb-2 text-[11px] uppercase tracking-[0.08em] text-black/50">Items</p>
                 {order.items.map((i, n) => (
-                    <div key={n} className="flex justify-between border-b border-[var(--a-border-soft)] py-2"><span>{i.title} · {i.size} × {i.qty}</span><span>{money(i.price * i.qty)}</span></div>
+                    <div key={`${i.sku}-${n}`} className="flex justify-between gap-4 border-b border-[var(--a-border-soft)] py-2">
+                        <span>
+                            {i.name ?? i.sku}{i.quantity > 1 ? ` × ${i.quantity}` : ""}
+                            {(i.colourway || i.size) && <span className="block text-[12px] text-black/50">{[i.colourway, i.size ? `UK ${i.size}` : null].filter(Boolean).join(" · ")}</span>}
+                        </span>
+                        <span>{money(i.totalPrice)}</span>
+                    </div>
                 ))}
                 <div className="mt-3 space-y-1">
-                    <div className="flex justify-between"><span>Subtotal</span><span>{money(orderSubtotal(order))}</span></div>
-                    {order.discount > 0 && <div className="flex justify-between"><span>Discount {order.discountCode && `(${order.discountCode})`}</span><span>−{money(order.discount)}</span></div>}
-                    <div className="flex justify-between"><span>Shipping</span><span>{money(order.shipping)}</span></div>
-                    <div className="flex justify-between border-t border-[var(--a-border-soft)] pt-2 font-medium"><span>Total</span><span>{money(orderTotal(order))}</span></div>
-                </div>
-            </section>
-            {order.notes && <section><p className="mb-1 text-[11px] uppercase tracking-[0.08em] text-black/50">Notes</p><p>{order.notes}</p></section>}
-            {order.trackingNumber && <p>Tracking: {order.trackingNumber}</p>}
-
-            <div className="space-y-3 border-t border-[var(--a-border-soft)] pt-5">
-                {order.status === "AWAITING_PAYMENT" && <button className={btnSolid} onClick={() => markPaid(order.id)}>Mark as paid</button>}
-                {order.status === "AWAITING_FULFILMENT" && (
-                    <div className="flex gap-2">
-                        <input value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="Tracking number" className={inputCls} />
-                        <button className={btnSolid} disabled={!tracking.trim()} onClick={() => markShipped(order.id, tracking.trim())}>Mark shipped</button>
-                    </div>
-                )}
-                <div className="flex items-center gap-4">
-                    <Link to={`/admin/emails?tab=compose&order=${order.id}`} className={btn}>Email customer</Link>
-                    {(order.status === "AWAITING_PAYMENT" || order.status === "AWAITING_FULFILMENT") && (
-                        <button className={linkBtn} onClick={() => { if (confirm(`Cancel order ${order.number}?`)) cancelOrder(order.id); }}>Cancel order</button>
+                    <div className="flex justify-between"><span>Subtotal</span><span>{money(order.subtotal)}</span></div>
+                    {(order.discountTotal ?? 0) > 0 && <div className="flex justify-between"><span>Discount</span><span>−{money(order.discountTotal ?? 0)}</span></div>}
+                    <div className="flex justify-between"><span>Shipping</span><span>{order.shippingWaived ? "Complimentary" : money(order.shippingTotal)}</span></div>
+                    <div className="flex justify-between border-t border-[var(--a-border-soft)] pt-2 font-medium"><span>Total</span><span>{money(order.grandTotal)}</span></div>
+                    {order.paid && order.settlementAmount !== null && order.settlementCurrency && (
+                        <div className="flex justify-between text-black/60"><span>Charged{order.providerTransactionId ? ` · txn ${order.providerTransactionId}` : ""}</span><span>{formatMoney(order.settlementAmount, order.settlementCurrency)}</span></div>
                     )}
                 </div>
-                <p className="text-[11px] text-black/40">Status changes queue the matching emails in Emails &gt; Pipeline.</p>
+            </section>
+            {order.notes && <section><p className="m-0 mb-1 text-[11px] uppercase tracking-[0.08em] text-black/50">Notes</p><p className="m-0">{order.notes}</p></section>}
+            {order.paidAt && <p className="m-0 text-black/60">Paid {fmtDateTime(order.paidAt)}</p>}
+            {order.trackingNumber && (
+                <p className="m-0 text-black/60">
+                    Shipped{order.shippedAt ? ` ${fmtDateTime(order.shippedAt)}` : ""} · tracking{" "}
+                    {order.trackingUrl ? <a href={order.trackingUrl} target="_blank" rel="noreferrer" className="underline">{order.trackingNumber}</a> : order.trackingNumber}
+                </p>
+            )}
+
+            {actions.bottom && <div className="border-t border-[var(--a-border-soft)] pt-5">{actions.bottom}</div>}
+
+            <div className="space-y-3 border-t border-[var(--a-border-soft)] pt-5">
+                {order.customerEmail ? (
+                    <div className="flex flex-wrap gap-2">
+                        {stage === "AWAITING_FULFILMENT" && <Link to={composeLink(order, "PIECE_READY")} className={btn}>Piece is ready</Link>}
+                        {(stage === "AWAITING_FULFILMENT" || stage === "SHIPPED" || stage === "COMPLETED") && <Link to={composeLink(order, "ON_THE_WAY")} className={btn}>Order on the way</Link>}
+                        <Link to={composeLink(order)} className={btn}>Email customer</Link>
+                    </div>
+                ) : <p className="m-0 text-black/50">This order has no customer email.</p>}
+                <p className="m-0 text-[11px] text-black/40">Actions above change the order straight away. Emails to the customer are only sent from here.</p>
             </div>
         </div>
     );
 }
 
-function NewOrderForm({ onDone }: { onDone: () => void }) {
-    const addOrder = useAdmin((s) => s.addOrder);
-    const discounts = useAdmin((s) => s.discounts);
-    const products = useProducts({ includeHidden: true });
-    const blank = (): OrderItem => ({ handle: products[0].handle, title: products[0].title, size: SIZES[1], qty: 1, price: products[0].price });
-    const [items, setItems] = useState<OrderItem[]>([blank()]);
-    const [f, setF] = useState({ name: "", email: "", phone: "", shipTo: "", source: "whatsapp" as OrderSource, shipping: "0", code: "", notes: "", paid: false });
-    const set = (k: keyof typeof f, v: string | boolean) => setF((p) => ({ ...p, [k]: v }));
-
-    const subtotal = items.reduce((n, i) => n + i.price * i.qty, 0);
-    const link = discounts.find((d) => d.active && d.code.toLowerCase() === f.code.trim().toLowerCase());
-    const discount = !link ? 0 : link.type === "PERCENTAGE" ? Math.round(subtotal * link.value) / 100 : Math.min(link.value, subtotal);
-    const total = Math.max(0, subtotal - discount) + (Number(f.shipping) || 0);
-
-    const setItem = (i: number, patch: Partial<OrderItem>) => setItems((xs) => xs.map((x, n) => (n === i ? { ...x, ...patch } : x)));
-    const pickProduct = (i: number, handle: string) => {
-        const p = products.find((x) => x.handle === handle)!;
-        setItem(i, { handle, title: p.title, price: p.price });
-    };
-
-    const submit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const input: NewOrder = {
-            source: f.source, customer: { name: f.name, email: f.email, phone: f.phone }, shipTo: f.shipTo, items,
-            shipping: Number(f.shipping) || 0, discount, discountCode: link?.code, notes: f.notes || undefined, paid: f.paid,
-        };
-        addOrder(input);
-        onDone();
-    };
-
-    return (
-        <form onSubmit={submit} className="space-y-4 text-[13px]">
-            <div className="grid gap-3 sm:grid-cols-2">
-                <input required placeholder="Customer name" value={f.name} onChange={(e) => set("name", e.target.value)} className={inputCls} />
-                <input required type="email" placeholder="Email" value={f.email} onChange={(e) => set("email", e.target.value)} className={inputCls} />
-                <input placeholder="Phone" value={f.phone} onChange={(e) => set("phone", e.target.value)} className={inputCls} />
-                <select value={f.source} onChange={(e) => set("source", e.target.value)} className={inputCls}>{SOURCES.map((s) => <option key={s}>{s}</option>)}</select>
-            </div>
-            <input placeholder="Ship to (address)" value={f.shipTo} onChange={(e) => set("shipTo", e.target.value)} className={inputCls} />
-
-            <div className="space-y-2">
-                <p className="text-[11px] uppercase tracking-[0.08em] text-black/50">Items</p>
-                {items.map((it, i) => (
-                    <div key={i} className="grid grid-cols-[minmax(0,1fr)_72px_64px_24px] items-center gap-2">
-                        <select aria-label="Product" value={it.handle} onChange={(e) => pickProduct(i, e.target.value)} className={inputCls}>{products.map((p) => <option key={p.handle} value={p.handle}>{p.title}</option>)}</select>
-                        <select aria-label="Size" value={it.size} onChange={(e) => setItem(i, { size: e.target.value })} className={`${inputCls} !px-2`}>{SIZES.map((s) => <option key={s}>{s}</option>)}</select>
-                        <input aria-label="Quantity" type="number" min={1} value={it.qty} onChange={(e) => setItem(i, { qty: Math.max(1, Number(e.target.value) || 1) })} className={`${inputCls} !px-2 text-center`} />
-                        {items.length > 1
-                            ? <button type="button" aria-label="Remove item" onClick={() => setItems((xs) => xs.filter((_, n) => n !== i))} className="text-lg leading-none text-black/50 hover:text-black">×</button>
-                            : <span />}
-                    </div>
-                ))}
-                <button type="button" className={linkBtn} onClick={() => setItems((xs) => [...xs, blank()])}>Add another item</button>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-                <input type="number" min={0} placeholder="Shipping (₵)" value={f.shipping} onChange={(e) => set("shipping", e.target.value)} className={inputCls} />
-                <input placeholder="Discount code (optional)" value={f.code} onChange={(e) => set("code", e.target.value)} className={inputCls} />
-            </div>
-            {f.code && <p className="text-[12px] text-black/60">{link ? `Applies ${link.type === "PERCENTAGE" ? `${link.value}%` : money(link.value)} off.` : "No active discount with that code."}</p>}
-            <textarea placeholder="Notes (measurements, delivery details…)" rows={2} value={f.notes} onChange={(e) => set("notes", e.target.value)} className={inputCls} />
-            <label className="flex items-center gap-2"><input type="checkbox" checked={f.paid} onChange={(e) => set("paid", e.target.checked)} /> Already paid</label>
-            <div className="flex items-center justify-between border-t border-[var(--a-border-soft)] pt-4">
-                <span className="font-medium">Total {money(total)}</span>
-                <button className={btnSolid}>Create order</button>
-            </div>
-            <p className="text-[11px] text-black/40">Creating the order queues its confirmation email in Emails &gt; Pipeline.</p>
-        </form>
-    );
-}
-
-const orderNo = (o: Order) => Number(o.number.replace(/\D/g, "")) || 0;
-
 export function Orders() {
-    const orders = useAdmin((s) => s.orders);
+    const { orders, loading } = useAdminData();
     const [tab, setTab] = useState<(typeof TABS)[number]>("ALL");
     const [q, setQ] = useState("");
-    const [source, setSource] = useState("");
+    const [country, setCountry] = useState("");
     const [payment, setPayment] = useState("");
+    const [source, setSource] = useState("");
+    const [creating, setCreating] = useState(false);
     const [from, setFrom] = useState("");
     const [to, setTo] = useState("");
     const [min, setMin] = useState("");
     const [max, setMax] = useState("");
-    const [openId, setOpenId] = useState<string | null>(null);
-    const [creating, setCreating] = useState(false);
+    const [params, setParams] = useSearchParams();
+    const [openId, setOpenId] = useState<string | null>(params.get("order"));
+    // An address like /orders?order=ORD-… opens that order, which is how the customer page links here.
+    useEffect(() => { const n = params.get("order"); if (n) setOpenId(n); }, [params]);
+    const closeOrder = () => { setOpenId(null); if (params.has("order")) setParams((p) => { p.delete("order"); return p; }, { replace: true }); };
+
+    const countries = useMemo(() => [...new Set(orders.map((o) => o.shipToCountry).filter(Boolean) as string[])].sort(), [orders]);
+
+    const sources = useMemo(() => [...new Set(orders.map(sourceOf))].sort(), [orders]);
 
     const filtered = useMemo(() => orders.filter((o) => {
-        const total = orderTotal(o);
-        const day = o.placedAt.slice(0, 10);
-        return (tab === "ALL" || o.status === tab)
-            && (!source || o.source === source)
-            && (!payment || (payment === "paid" ? !!o.paidAt : !o.paidAt))
+        const day = (o.placedAt ?? "").slice(0, 10);
+        return (tab === "ALL" || stageOf(o) === tab)
+            && (!country || o.shipToCountry === country)
+            && (!payment || (payment === "paid" ? o.paid : !o.paid))
+            && (!source || sourceOf(o) === source)
             && (!from || day >= from) && (!to || day <= to)
-            && (!min || total >= Number(min)) && (!max || total <= Number(max))
-            && (!q.trim() || `${o.number} ${o.customer.name} ${o.customer.email}`.toLowerCase().includes(q.toLowerCase()));
-    }), [orders, tab, q, source, payment, from, to, min, max]);
+            && (!min || o.grandTotal >= Number(min)) && (!max || o.grandTotal <= Number(max))
+            && (!q.trim() || `${o.orderNumber} ${o.customerName ?? ""} ${o.customerEmail ?? ""}`.toLowerCase().includes(q.trim().toLowerCase()));
+    }), [orders, tab, q, country, payment, source, from, to, min, max]);
 
     const { sorted, sort, toggle } = useSort(filtered, {
-        number: orderNo, date: (o) => o.placedAt, customer: (o) => o.customer.name, source: (o) => o.source,
-        status: (o) => ORDER_LABEL[o.status], total: orderTotal,
+        number: orderNo, date: placedTime, customer: (o) => o.customerName ?? "", country: (o) => o.shipToCountry ?? "", source: sourceLabel,
+        status: (o) => STAGE_LABEL[stageOf(o)], total: (o) => o.grandTotal,
     });
-    const paged = usePaged(sorted, JSON.stringify([tab, q, source, payment, from, to, min, max, sort]));
-    const count = (t: (typeof TABS)[number]) => (t === "ALL" ? orders.length : orders.filter((o) => o.status === t).length);
-    const dirty = !!(q || source || payment || from || to || min || max);
-    const clear = () => { setQ(""); setSource(""); setPayment(""); setFrom(""); setTo(""); setMin(""); setMax(""); };
+    const paged = usePaged(sorted, JSON.stringify([tab, q, country, payment, source, from, to, min, max, sort]));
+    const count = (t: (typeof TABS)[number]) => (t === "ALL" ? orders.length : orders.filter((o) => stageOf(o) === t).length);
+    const dirty = !!(q || country || payment || source || from || to || min || max);
+    const clear = () => { setQ(""); setCountry(""); setPayment(""); setSource(""); setFrom(""); setTo(""); setMin(""); setMax(""); };
+    const open = orders.find((o) => o.orderNumber === openId);
+
+    function download() {
+        const url = URL.createObjectURL(new Blob([csvOf(sorted)], { type: "text/csv" }));
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `ometsey-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
 
     return (
         <>
-            <PageHead title="Orders" subtitle={`${orders.length} orders`}><button className={btnSolid} onClick={() => setCreating(true)}>New order</button></PageHead>
-            <div className="mb-5"><Tabs value={tab} onChange={setTab} items={TABS.map((t) => ({ id: t, label: t === "ALL" ? "All" : ORDER_LABEL[t], count: count(t) }))} /></div>
+            <PageHead title="Orders" subtitle={`${orders.length} orders`}>
+                <button className={btn} disabled={!sorted.length} onClick={download}>Export CSV</button>
+                <button className={btnSolid} onClick={() => setCreating(true)}>New order</button>
+            </PageHead>
+            <DataNotices of={["orders"]} />
+            <div className="mb-5"><Tabs value={tab} onChange={setTab} items={TABS.map((t) => ({ id: t, label: t === "ALL" ? "All" : STAGE_LABEL[t], count: count(t) }))} /></div>
 
             <div className="mb-5 flex flex-wrap items-end gap-3">
-                <FilterField label="Search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Order, name or email" className={`${inputCls} w-[200px]`} /></FilterField>
-                <FilterField label="Source"><select value={source} onChange={(e) => setSource(e.target.value)} className={`${inputCls} w-[130px]`}><option value="">All</option>{SOURCES.map((x) => <option key={x}>{x}</option>)}</select></FilterField>
-                <FilterField label="Payment"><select value={payment} onChange={(e) => setPayment(e.target.value)} className={`${inputCls} w-[110px]`}><option value="">All</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option></select></FilterField>
+                <FilterField label="Search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Order, name or email" className={`${inputBare} w-[200px]`} /></FilterField>
+                <FilterField label="Ship to"><select value={country} onChange={(e) => setCountry(e.target.value)} className={`${inputBare} w-[130px]`}><option value="">All</option>{countries.map((x) => <option key={x}>{x}</option>)}</select></FilterField>
+                <FilterField label="Payment"><select value={payment} onChange={(e) => setPayment(e.target.value)} className={`${inputBare} w-[110px]`}><option value="">All</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option></select></FilterField>
+                {sources.length > 1 && <FilterField label="Source"><select value={source} onChange={(e) => setSource(e.target.value)} className={`${inputBare} w-[120px]`}><option value="">All</option>{sources.map((x) => <option key={x} value={x}>{SOURCE_LABEL[x] ?? x}</option>)}</select></FilterField>}
                 <FilterField label="Placed between">
                     <span className="flex items-center gap-1.5">
-                        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={`${inputCls} w-[140px]`} aria-label="From date" />
+                        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={`${inputBare} w-[140px]`} aria-label="From date" />
                         <span className="text-black/30">–</span>
-                        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={`${inputCls} w-[140px]`} aria-label="To date" />
+                        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={`${inputBare} w-[140px]`} aria-label="To date" />
                     </span>
                 </FilterField>
-                <FilterField label="Total (₵)">
+                <FilterField label="Total">
                     <span className="flex items-center gap-1.5">
-                        <input type="number" min={0} value={min} onChange={(e) => setMin(e.target.value)} placeholder="Min" className={`${inputCls} w-[84px]`} />
+                        <input type="number" min={0} value={min} onChange={(e) => setMin(e.target.value)} placeholder="Min" className={`${inputBare} w-[84px]`} />
                         <span className="text-black/30">–</span>
-                        <input type="number" min={0} value={max} onChange={(e) => setMax(e.target.value)} placeholder="Max" className={`${inputCls} w-[84px]`} />
+                        <input type="number" min={0} value={max} onChange={(e) => setMax(e.target.value)} placeholder="Max" className={`${inputBare} w-[84px]`} />
                     </span>
                 </FilterField>
                 {dirty && <button onClick={clear} className={`${linkBtn} pb-2`}>Clear filters</button>}
@@ -195,28 +200,30 @@ export function Orders() {
                 {sorted.length ? (
                     <>
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[680px]">
+                            <table className="w-full min-w-[760px] border-collapse">
                                 <thead><tr>
                                     <SortTh label="Order" k="number" sort={sort} toggle={toggle} /><SortTh label="Date" k="date" sort={sort} toggle={toggle} />
-                                    <SortTh label="Customer" k="customer" sort={sort} toggle={toggle} /><SortTh label="Source" k="source" sort={sort} toggle={toggle} />
+                                    <SortTh label="Customer" k="customer" sort={sort} toggle={toggle} /><SortTh label="Ship to" k="country" sort={sort} toggle={toggle} />{sources.length > 1 && <SortTh label="Source" k="source" sort={sort} toggle={toggle} />}
                                     <SortTh label="Status" k="status" sort={sort} toggle={toggle} /><SortTh label="Total" k="total" sort={sort} toggle={toggle} right />
                                 </tr></thead>
                                 <tbody>{paged.rows.map((o) => (
-                                    <tr key={o.id} onClick={() => setOpenId(o.id)} className="cursor-pointer border-t border-[var(--a-border-soft)]">
-                                        <Td>{o.number}{o.sample && <span className="ml-2 text-[10px] text-black/40">SAMPLE</span>}</Td>
-                                        <Td>{fmtDate(o.placedAt)}</Td><Td>{o.customer.name}</Td><Td>{o.source}</Td>
-                                        <Td><OrderBadge status={o.status} /></Td><Td right>{money(orderTotal(o))}</Td>
+                                    <tr key={o.orderNumber} onClick={() => setOpenId(o.orderNumber)} className="cursor-pointer border-t border-[var(--a-border-soft)]">
+                                        <Td className="font-medium">{o.orderNumber}</Td>
+                                        <Td>{fmtDate(o.placedAt)}</Td><Td>{o.customerName || "—"}</Td><Td>{o.shipToCountry || "—"}</Td>{sources.length > 1 && <Td>{sourceLabel(o)}</Td>}
+                                        <Td><OrderBadge order={o} />{o.paymentStatus !== "FAILED" && unpaidNote(o) && <span className="mt-1 block text-[11px] text-black/50">{unpaidNote(o)}</span>}</Td><Td right>{formatMoney(o.grandTotal, o.currency)}</Td>
                                     </tr>))}</tbody>
                             </table>
                         </div>
-                        <Pagination p={paged} />
+                        <Pagination p={paged} always />
                     </>
-                ) : <Empty>{orders.length ? <>No orders match. {dirty && <button onClick={clear} className={linkBtn}>Clear filters</button>}</> : "No orders yet. Create one with “New order”, or load sample data from Settings."}</Empty>}
+                ) : <Empty>{loading ? "Loading…" : orders.length ? <>No orders match. {dirty && <button onClick={clear} className={linkBtn}>Clear filters</button>}</> : "No orders yet. They appear here as customers check out."}</Empty>}
             </Card>
-            <Drawer open={openId !== null} onClose={() => setOpenId(null)} title={orders.find((o) => o.id === openId)?.number ?? "Order"}>
-                <OrderDetail order={orders.find((o) => o.id === openId)} />
+            <Drawer open={creating} onClose={() => setCreating(false)} title="New order">
+                <NewOrder onClose={() => setCreating(false)} onCreated={(n) => { setCreating(false); setOpenId(n); }} />
             </Drawer>
-            <Drawer open={creating} onClose={() => setCreating(false)} title="New order"><NewOrderForm onDone={() => setCreating(false)} /></Drawer>
+            <Drawer open={openId !== null} onClose={closeOrder} title={open?.orderNumber ?? openId ?? "Order"}>
+                {open ? <OrderDetail key={open.orderNumber} order={open} /> : <p className="m-0 py-10 text-center text-[13px] text-black/50">{loading ? "Loading…" : "That order isn’t in the loaded list."}</p>}
+            </Drawer>
         </>
     );
 }

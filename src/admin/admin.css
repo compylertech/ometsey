@@ -1,0 +1,139 @@
+/*
+ * Admin portal skin. Every colour is a --a-* variable, so a theme is just a set of values.
+ *
+ * The storefront ships unlayered global rules (`button { padding; background }`,
+ * `a { font-weight }`, `a:hover { color }`) that beat Tailwind utilities, which live in a
+ * cascade layer. So inside .admin, buttons and links are styled by the plain classes below
+ * rather than by utilities, and the few one-off button utilities in the admin use the
+ * trailing `!` modifier.
+ */
+
+.admin {
+  --a-accent: #000; --a-accent-hover: #2b2b2b;
+  --a-bg: #f6f6f6; --a-surface-alt: #fff; --a-subtle: #fafafa;
+  --a-border: #e4e4e4; --a-border-soft: #eeeeee;
+  --a-side: #0a0a0a; --a-side-accent: #fff;
+  --a-warn-bg: #f4f4f4; --a-warn-border: #d4d4d4; --a-warn-ink: #111;
+  /* Status and trend colours carry meaning, so they stay colour-coded in every theme. */
+  --a-up: #047857; --a-down: #b91c1c;
+  --a-st-pay: #c98a14; --a-st-ful: #2f6f9f; --a-st-ship: #6d5bb3; --a-st-done: #3f8a5a; --a-st-can: #b91c1c; --a-st-ref: #6b7280;
+
+  color-scheme: light;
+  color: #111;
+  background: var(--a-bg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+}
+.admin[data-admin-theme="brand"] {
+  --a-accent: #76410f; --a-accent-hover: #5e3309;
+  --a-bg: #f6f1e7; --a-surface-alt: #fffef8; --a-subtle: #faf6ec;
+  --a-border: #e6dccb; --a-border-soft: #eee6d6;
+  --a-side: #1f1409; --a-side-accent: #d9b27c;
+  --a-warn-bg: #fffbeb; --a-warn-border: #fde68a; --a-warn-ink: #451a03;
+}
+
+.admin *, .admin *::before, .admin *::after { border-radius: 0; box-shadow: none; }
+.admin a { font-weight: inherit; color: inherit; }
+.admin a:hover { color: inherit; }
+.admin button {
+  padding: 0; margin: 0; border: 0; background: transparent;
+  font: inherit; color: inherit; cursor: pointer; text-align: inherit;
+}
+.admin button:disabled { cursor: not-allowed; }
+.admin tbody tr:hover { background: var(--a-subtle); }
+.admin input, .admin select, .admin textarea { font: inherit; color: inherit; }
+
+/* ---------- buttons and links ---------- */
+
+.admin .a-btn, .admin .a-btn-solid, .admin .a-btn-ok, .admin .a-btn-danger {
+  display: inline-block;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: border-color .15s, background .15s;
+  text-align: center;
+}
+.admin .a-btn { border: 1px solid rgb(0 0 0 / .15); background: #fff; color: #111; }
+.admin .a-btn:hover:not(:disabled) { border-color: rgb(0 0 0 / .4); }
+.admin .a-btn-solid { background: var(--a-accent); color: #fff; border: 1px solid var(--a-accent); }
+.admin .a-btn-solid:hover:not(:disabled) { background: var(--a-accent-hover); }
+/* Green for the safe forward action, red for the one that is hard to undo. Fixed colours, not theme ones. */
+.admin .a-btn-ok { background: #2f7d4f; color: #fff; border: 1px solid #2f7d4f; }
+.admin .a-btn-ok:hover:not(:disabled) { background: #276a43; border-color: #276a43; }
+.admin .a-btn-danger { background: #b91c1c; color: #fff; border: 1px solid #b91c1c; }
+.admin .a-btn-danger:hover:not(:disabled) { background: #991b1b; border-color: #991b1b; }
+.admin .a-btn:disabled, .admin .a-btn-solid:disabled, .admin .a-btn-ok:disabled, .admin .a-btn-danger:disabled { opacity: .4; }
+.admin a.a-btn-solid, .admin a.a-btn-solid:hover { color: #fff; }
+.admin .a-link { font-size: 12.5px; font-weight: 500; color: var(--a-accent); }
+.admin .a-link:hover { text-decoration: underline; }
+.admin a.a-link:hover { color: var(--a-accent); }
+
+/* ---------- fields ---------- */
+
+.admin .a-input {
+  display: block;
+  border: 1px solid rgb(0 0 0 / .15);
+  background: #fff;
+  padding: 8px 12px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color .15s;
+}
+.admin .a-input:focus { border-color: var(--a-accent); }
+.admin .a-input[aria-invalid="true"] { border-color: var(--a-down); }
+.admin textarea.a-input { resize: vertical; }
+
+/* ---------- navigation ---------- */
+
+.admin .a-nav {
+  display: flex; flex-shrink: 0; align-items: center; gap: 12px; white-space: nowrap;
+  padding: 10px 12px; font-size: 13px; color: rgb(255 255 255 / .6);
+  transition: background .15s, color .15s;
+}
+.admin .a-nav:hover { background: rgb(255 255 255 / .05); color: #fff; }
+.admin a.a-nav:hover { color: #fff; }
+.admin .a-nav.is-active { background: rgb(255 255 255 / .1); color: #fff; font-weight: 500; }
+.admin .a-nav.is-active .a-nav-icon { color: var(--a-side-accent); }
+.admin .a-side-btn {
+  display: flex; width: 100%; align-items: center; gap: 12px;
+  padding: 14px 24px; font-size: 12px; color: rgb(255 255 255 / .6);
+  border-top: 1px solid rgb(255 255 255 / .1);
+}
+.admin .a-side-btn:hover { background: rgb(255 255 255 / .05); color: #fff; }
+
+/* ---------- tabs, segmented control, pagination, tables ---------- */
+
+.admin .a-tab {
+  margin-bottom: -1px; padding: 4px 0 10px; font-size: 13px; font-weight: 500;
+  border-bottom: 2px solid transparent; color: rgb(0 0 0 / .5); transition: color .15s;
+}
+.admin .a-tab:hover { color: #000; }
+.admin .a-tab.is-active { border-bottom-color: var(--a-accent); color: var(--a-accent); }
+.admin .a-seg { padding: 6px 12px; font-size: 12.5px; font-weight: 500; color: rgb(0 0 0 / .6); }
+.admin .a-seg:hover { color: #000; }
+.admin .a-seg.is-active { background: var(--a-accent); color: #fff; }
+.admin .a-pg {
+  display: grid; height: 32px; min-width: 32px; place-items: center;
+  border: 1px solid rgb(0 0 0 / .15); padding: 0 8px; font-size: 12.5px; background: transparent;
+}
+.admin .a-pg:hover:not(:disabled) { border-color: rgb(0 0 0 / .4); }
+.admin .a-pg:disabled { opacity: .3; }
+.admin .a-pg.is-current { border-color: var(--a-accent); background: var(--a-accent); color: #fff; }
+.admin .a-sort {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .05em; color: rgb(0 0 0 / .45);
+}
+.admin .a-sort:hover, .admin .a-sort.is-active { color: #000; }
+.admin .a-x { display: grid; height: 32px; width: 32px; place-items: center; font-size: 20px; line-height: 1; }
+.admin .a-x:hover { background: rgb(0 0 0 / .05); }
+
+/* ---------- group picker (emails) ---------- */
+
+.admin .a-group {
+  display: block; width: 100%; border: 1px solid var(--a-border); background: #fff;
+  padding: 10px 12px; transition: border-color .15s;
+}
+.admin .a-group:hover { border-color: rgb(0 0 0 / .35); }
+.admin .a-group.is-active { border-color: var(--a-accent); box-shadow: inset 3px 0 0 var(--a-accent); }

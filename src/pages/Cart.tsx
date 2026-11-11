@@ -1,19 +1,20 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
 import { PageShell } from "@/components/Form"
-import { money } from "@/data/catalog"
 import { useProducts } from "@/store/catalog"
+import { useMoney } from "@/store/market"
 import { useCart } from "@/store/cart"
 
 export function Cart() {
     const { lines, setQty, remove } = useCart();
     const products = useProducts();
+    const { fmt, fmtProduct, priceOf } = useMoney();
     const [notice, setNotice] = useState(false);
     const rows = lines.flatMap((l) => {
         const product = products.find((p) => p.handle === l.handle);
         return product ? [{ ...l, product }] : [];
     });
-    const subtotal = rows.reduce((n, r) => n + r.product.price * r.qty, 0);
+    const subtotal = rows.reduce((n, r) => n + priceOf(r.product) * r.qty, 0);
 
     if (!rows.length) {
         return (
@@ -37,7 +38,7 @@ export function Cart() {
                                 <div>
                                     <p className="uppercase tracking-[0.03em]">{r.product.title}</p>
                                     <p className="mt-1 text-black/60">Size {r.size}</p>
-                                    <p className="mt-1">{money(r.product.price)}</p>
+                                    <p className="mt-1">{fmtProduct(r.product)}</p>
                                 </div>
                                 <div className="flex items-center gap-6">
                                     <div className="flex items-center border border-black/25">
@@ -48,12 +49,12 @@ export function Cart() {
                                     <button onClick={() => remove(r.handle, r.size)} className="border-b border-black text-[12px]">Remove</button>
                                 </div>
                             </div>
-                            <p className="text-[13px]">{money(r.product.price * r.qty)}</p>
+                            <p className="text-[13px]">{fmt(priceOf(r.product) * r.qty)}</p>
                         </div>
                     ))}
                 </div>
                 <aside className="h-fit border border-line p-6">
-                    <div className="flex justify-between text-[14px] uppercase"><span>Subtotal</span><span>{money(subtotal)}</span></div>
+                    <div className="flex justify-between text-[14px] uppercase"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
                     <p className="mt-3 text-[12px] text-black/60">Worldwide shipping. Taxes and shipping are calculated at checkout.</p>
                     <button onClick={() => setNotice(true)} className="btn-black mt-6 w-full">Checkout</button>
                     {notice && <p className="mt-3 text-[12px] leading-5 text-black/60">Checkout isn’t connected to payments yet.</p>}

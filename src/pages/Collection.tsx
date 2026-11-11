@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link, useParams, useSearchParams } from "react-router-dom"
 import { CATEGORIES, COLLECTION_TITLES, COLOR_SWATCH, SIZES, colorOf, productsFor } from "@/data/catalog"
+import { CURRENCIES } from "@/lib/money"
 import { useProducts } from "@/store/catalog"
+import { useMoney } from "@/store/market"
 import { ProductCard } from "@/components/ProductCard"
 import { CloseIcon } from "@/components/Icons"
 
@@ -45,7 +47,8 @@ export function Collection() {
 function CollectionPage({ handle }: { handle: string }) {
     const catalog = useProducts();
     const base = useMemo(() => productsFor(catalog, handle), [catalog, handle]);
-    const prices = base.map((p) => p.price);
+    const { priceOf, currency } = useMoney();
+    const prices = base.map((p) => priceOf(p));
     const lo = Math.min(...prices, 0), hi = Math.max(...prices, 0);
 
     const [sort, setSort] = useState<Sort>("featured");
@@ -57,6 +60,8 @@ function CollectionPage({ handle }: { handle: string }) {
     const [min, setMin] = useState<number | null>(null);
     const [max, setMax] = useState<number | null>(null);
     const pmin = min ?? lo, pmax = max ?? hi;
+    // A range chosen in one currency means nothing in another, so start again when the currency changes.
+    useEffect(() => { setMin(null); setMax(null); }, [currency]);
 
     const [params, setParams] = useSearchParams();
     const gridTop = useRef<HTMLDivElement>(null);
@@ -67,9 +72,9 @@ function CollectionPage({ handle }: { handle: string }) {
     const items = (stockOk ? base : [])
         .filter((p) => !cats.length || cats.includes(p.category))
         .filter((p) => !colors.length || colors.includes(colorOf(p) ?? ""))
-        .filter((p) => p.price >= pmin && p.price <= pmax);
-    if (sort === "low") items.sort((a, b) => a.price - b.price);
-    if (sort === "high") items.sort((a, b) => b.price - a.price);
+        .filter((p) => priceOf(p) >= pmin && priceOf(p) <= pmax);
+    if (sort === "low") items.sort((a, b) => priceOf(a) - priceOf(b));
+    if (sort === "high") items.sort((a, b) => priceOf(b) - priceOf(a));
     if (sort === "az") items.sort((a, b) => a.title.localeCompare(b.title));
 
     const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
@@ -160,9 +165,9 @@ function CollectionPage({ handle }: { handle: string }) {
                             <input type="range" aria-label="Minimum price" min={lo} max={hi} value={pmin} onChange={(e) => setMin(Math.min(+e.target.value, pmax))} className="w-full accent-black" />
                             <input type="range" aria-label="Maximum price" min={lo} max={hi} value={pmax} onChange={(e) => setMax(Math.max(+e.target.value, pmin))} className="mt-1 w-full accent-black" />
                             <div className="mt-4 flex items-center gap-3 text-[12px]">
-                                <span className="flex-1 border border-black/25 px-3 py-2.5">₵ {pmin.toLocaleString()}</span>
+                                <span className="flex-1 border border-black/25 px-3 py-2.5">{CURRENCIES[currency].symbol} {pmin.toLocaleString()}</span>
                                 <span className="text-black/30">▪</span>
-                                <span className="flex-1 border border-black/25 px-3 py-2.5">₵ {pmax.toLocaleString()}</span>
+                                <span className="flex-1 border border-black/25 px-3 py-2.5">{CURRENCIES[currency].symbol} {pmax.toLocaleString()}</span>
                             </div>
                         </div>
                     </div>

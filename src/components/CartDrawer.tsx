@@ -1,18 +1,19 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { money } from "@/data/catalog"
 import { useProducts } from "@/store/catalog"
+import { useMoney } from "@/store/market"
 import { useCart } from "@/store/cart"
 
 export function CartDrawer() {
     const { lines, open, setOpen, remove } = useCart();
     const products = useProducts();
+    const { fmt, priceOf } = useMoney();
     const [notice, setNotice] = useState(false);
     const rows = lines.flatMap((l) => {
         const product = products.find((p) => p.handle === l.handle);
         return product ? [{ ...l, product }] : [];
     });
-    const subtotal = rows.reduce((n, r) => n + r.product.price * r.qty, 0);
+    const subtotal = rows.reduce((n, r) => n + priceOf(r.product) * r.qty, 0);
     const count = rows.reduce((n, r) => n + r.qty, 0);
 
     return (
@@ -36,14 +37,14 @@ export function CartDrawer() {
                             <div className="flex-1 text-sm">
                                 <p className="label">{r.product.title}</p>
                                 <p className="mt-1 text-black/60">Size {r.size} · Qty {r.qty}</p>
-                                <p className="mt-1">{money(r.product.price * r.qty)}</p>
+                                <p className="mt-1">{fmt(priceOf(r.product) * r.qty)}</p>
                                 <button onClick={() => remove(r.handle, r.size)} className="mt-2 border-0 bg-transparent p-0 text-xs underline">Remove</button>
                             </div>
                         </div>
                     ))}
                 </div>
                 <div className="border-t border-line p-5">
-                    <div className="label flex justify-between"><span>Subtotal</span><span>{money(subtotal)}</span></div>
+                    <div className="label flex justify-between"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
                     <p className="mt-2 text-xs text-black/60">Taxes and shipping calculated at checkout.</p>
                     <button disabled={!rows.length} onClick={() => setNotice(true)} className="btn-black mt-4 w-full disabled:opacity-40">Checkout</button>
                     {notice && <p className="mt-3 text-[12px] leading-5 text-black/60">Checkout isn’t connected to payments yet.</p>}

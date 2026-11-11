@@ -103,6 +103,8 @@ export interface Product {
     images: string[];
     /** Set from the admin to take a product off the storefront without deleting it. */
     hidden?: boolean;
+    /** Price set by hand for a currency other than cedis. Without one, dollars are converted from the cedi price. */
+    prices?: { USD?: number };
     /** Colour for the colour filter; falls back to the lookup below for the original products. */
     color?: string;
     description: string;
@@ -213,6 +215,7 @@ export function productsFor(products: Product[], handle: string): Product[] {
 }
 
 /** Ometsey prices in Ghana cedis. */
+/** Cedis, for the admin, which works in the store's base currency. The storefront uses useMoney(). */
 export const money = (n: number) => `₵ ${n.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 /** Homepage imagery, all from ometsey.com. */

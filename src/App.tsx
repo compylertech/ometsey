@@ -19,7 +19,7 @@ import { Account } from "@/pages/Account"
 import { Wishlist } from "@/pages/Wishlist"
 import { Blog } from "@/pages/Blog"
 import { Cart } from "@/pages/Cart"
-import { AdminApp } from "@/admin/AdminApp"
+import AdminApp from "@/admin/AdminApp"
 
 function ScrollToTop() {
     const { pathname } = useLocation();

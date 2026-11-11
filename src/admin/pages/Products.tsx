@@ -1,234 +1,184 @@
-import { useMemo, useState } from "react"
-import { Link } from "react-router-dom"
-import { COLLECTION_TITLES, money, type Product } from "@/data/catalog"
-import { isBaseProduct, useCatalog, useProducts } from "@/store/catalog"
-import { usePaged, useSort } from "../hooks"
-import { useAdmin } from "../store"
-import { Card, Drawer, Empty, FilterField, PageHead, Pagination, SortTh, Td, Th, btn, btnSolid, inputCls, linkBtn } from "../ui"
+// global imports
+import { useMemo, useState } from "react";
 
-const COLLECTION_IDS = ["refined-basics", "refined-basics-ii", "capsule-collection", "siso", "2023-capsule-collection", "modern-retro-2"];
-type Status = "Active" | "Hidden" | "Removed";
+// local imports
+import { formatMoney } from "../shared";
+import { archiveProduct, setProductVisible, UnauthorizedError } from "../api";
+import { useAdminData } from "../data";
+import { usePaged, useSort } from "../hooks";
+import { Card, Drawer, Empty, FilterField, Notice, PageHead, Pagination, SortTh, StatePill, Td, Th, btn, btnDanger, btnSolid, inputBare, linkBtn } from "../ui";
+import type { AdminProductSummary } from "../types";
+import { AddProduct } from "./AddProduct";
+import { ExchangeRates } from "./ExchangeRates";
+import { ProductDrawerBody } from "./ProductDrawer";
+import { PricesPanel } from "./PricesPanel";
+import { Revenue } from "./Revenue";
+import { DataNotices } from "./notices";
 
-const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+const statusOf = (p: AdminProductSummary) => (p.visible === false ? (p.status === "ARCHIVED" ? "Archived" : "Draft") : "Live");
+const STATUS_COLOR: Record<string, string> = { Live: "var(--a-st-done)", Draft: "var(--a-st-pay)", Archived: "var(--a-st-ref)" };
 
-/** Downscale and re-encode an upload so a few photos don't fill the browser's storage. */
-async function resizeImage(file: File, max = 1000): Promise<string> {
-    const bmp = await createImageBitmap(file);
-    const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
-    const c = document.createElement("canvas");
-    c.width = Math.round(bmp.width * scale);
-    c.height = Math.round(bmp.height * scale);
-    c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
-    let q = 0.82, out = c.toDataURL("image/jpeg", q);
-    while (out.length > 300_000 && q > 0.4) { q -= 0.1; out = c.toDataURL("image/jpeg", q); }
-    return out;
-}
+type Panel = { kind: "prices" | "archive" | "view"; product: AdminProductSummary } | { kind: "add" } | { kind: "rates" } | null;
 
-function ImageField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-    const [error, setError] = useState("");
-    const upload = async (file?: File) => {
-        if (!file) return;
-        if (!file.type.startsWith("image/")) return setError("Choose an image file.");
-        try { setError(""); onChange(await resizeImage(file)); } catch { setError("That image couldn’t be read."); }
-    };
+function ArchivePanel({ product, onDone }: { product: AdminProductSummary; onDone: () => void }) {
+    const { token, unauthorized, upsertProduct } = useAdminData();
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    async function archive() {
+        setBusy(true);
+        setError(null);
+        try {
+            upsertProduct(await archiveProduct(token, product.id));
+            onDone();
+        } catch (err) {
+            if (err instanceof UnauthorizedError) return unauthorized();
+            setError(err instanceof Error ? err.message : "The product wasn’t archived.");
+        } finally {
+            setBusy(false);
+        }
+    }
+
     return (
-        <div className="flex gap-3">
-            <div className="grid h-24 w-[68px] shrink-0 place-items-center overflow-hidden border border-black/15 bg-white text-[10px] text-black/35">
-                {value ? <img src={value} alt="" className="h-full w-full object-cover" /> : "No image"}
-            </div>
-            <div className="min-w-0 flex-1 space-y-2">
-                <p className="text-[12px] text-black/55">{label}</p>
-                <input value={value.startsWith("data:") ? "" : value} onChange={(e) => onChange(e.target.value)} placeholder={value.startsWith("data:") ? "Uploaded image" : "Image URL or /images/… path"} className={inputCls} />
-                <label className={`${btn} inline-block cursor-pointer`}>Upload<input type="file" accept="image/*" className="hidden" onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ""; }} /></label>
-                {error && <p className="text-[12px] text-red-700">{error}</p>}
+        <div className="space-y-4 text-[13px]">
+            <p className="m-0 border border-[var(--a-st-can)] p-4">
+                Archive <b>{product.name}</b>? It comes off the storefront, its page stops working and its discount links stop working. Past orders keep it, and you can show it again later.
+            </p>
+            {error && <Notice tone="error">{error}</Notice>}
+            <div className="flex gap-3">
+                <button className={btnDanger} disabled={busy} onClick={() => void archive()}>{busy ? "Archiving..." : "Archive product"}</button>
+                <button className={btn} disabled={busy} onClick={onDone}>Keep it</button>
             </div>
         </div>
     );
 }
 
-function ProductForm({ product, all, onDone }: { product?: Product; all: Product[]; onDone: () => void }) {
-    const { addProduct, updateProduct } = useCatalog();
-    const [f, setF] = useState({
-        title: product?.title ?? "", price: product ? String(product.price) : "", category: product?.category ?? "",
-        description: product?.description ?? "", color: product?.color ?? "",
-        collections: product?.collections ?? [] as string[], newIn: product?.tags.includes("new-in") ?? false,
-        front: product?.images[0] ?? "", hover: product?.images[1] ?? "", hidden: product?.hidden ?? false,
-    });
-    const [error, setError] = useState("");
-    const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((p) => ({ ...p, [k]: v }));
-    const categories = useMemo(() => [...new Set(all.map((p) => p.category))].sort(), [all]);
-
-    const submit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const price = Number(f.price);
-        if (!f.title.trim()) return setError("Give the product a name.");
-        if (!(price > 0)) return setError("Enter a price above zero.");
-        if (!f.front.trim()) return setError("Add a front image.");
-        const category = slugify(f.category) || "uncategorised";
-        const tags = [...(product?.tags.filter((t) => t !== "new-in") ?? []), ...(f.newIn ? ["new-in"] : [])];
-        const fields = {
-            title: f.title.trim(), price, category, description: f.description.trim(), color: f.color.trim() || undefined,
-            collections: f.collections, tags, images: [f.front.trim(), (f.hover || f.front).trim()], hidden: f.hidden,
-        };
-        if (product) updateProduct(product.handle, fields);
-        else {
-            const taken = new Set(all.map((p) => p.handle));
-            let handle = slugify(f.title) || "product", n = 2;
-            while (taken.has(handle)) handle = `${slugify(f.title)}-${n++}`;
-            addProduct({ handle, ...fields });
-        }
-        onDone();
-    };
-
-    return (
-        <form onSubmit={submit} className="space-y-4 text-[13px]">
-            <input placeholder="Product name" value={f.title} onChange={(e) => set("title", e.target.value)} className={inputCls} />
-            {product && <p className="-mt-2 text-[11px] text-black/40">Link: /products/{product.handle} (fixed once created, so existing orders and bookmarks keep working)</p>}
-            <div className="grid gap-3 sm:grid-cols-2">
-                <input type="number" min={1} placeholder="Price (₵)" value={f.price} onChange={(e) => set("price", e.target.value)} className={inputCls} />
-                <div>
-                    <input list="admin-categories" placeholder="Category" value={f.category} onChange={(e) => set("category", e.target.value)} className={inputCls} />
-                    <datalist id="admin-categories">{categories.map((c) => <option key={c} value={c} />)}</datalist>
-                </div>
-            </div>
-            <textarea rows={3} placeholder="Description" value={f.description} onChange={(e) => set("description", e.target.value)} className={inputCls} />
-            <input placeholder="Colour (optional, e.g. Olive) for the colour filter" value={f.color} onChange={(e) => set("color", e.target.value)} className={inputCls} />
-            <div>
-                <p className="mb-2 text-[12px] text-black/55">Collections</p>
-                <div className="grid gap-1.5 sm:grid-cols-2">
-                    {COLLECTION_IDS.map((c) => (
-                        <label key={c} className="flex items-center gap-2"><input type="checkbox" checked={f.collections.includes(c)} onChange={(e) => set("collections", e.target.checked ? [...f.collections, c] : f.collections.filter((x) => x !== c))} />{COLLECTION_TITLES[c] ?? c}</label>
-                    ))}
-                </div>
-            </div>
-            <ImageField label="Front image" value={f.front} onChange={(v) => set("front", v)} />
-            <ImageField label="Hover image (optional)" value={f.hover} onChange={(v) => set("hover", v)} />
-            <label className="flex items-center gap-2"><input type="checkbox" checked={f.newIn} onChange={(e) => set("newIn", e.target.checked)} />Show in New In</label>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={f.hidden} onChange={(e) => set("hidden", e.target.checked)} />Hide from the storefront</label>
-            {error && <p className="text-[12px] text-red-700">{error}</p>}
-            <div className="flex items-center justify-end gap-3 border-t border-[var(--a-border-soft)] pt-4">
-                <button type="button" className={btn} onClick={onDone}>Cancel</button>
-                <button className={btnSolid}>{product ? "Save changes" : "Add product"}</button>
-            </div>
-        </form>
-    );
-}
-
-interface Row extends Product { status: Status; sold: number; revenue: number }
-
+/**
+ * The catalog: what is on sale, what has sold, and the few changes the admin API allows (show or
+ * hide, archive, prices, add a product). Sold and revenue come from the server, per product id.
+ */
 export function Products() {
-    const orders = useAdmin((s) => s.orders);
-    const { removeProduct, restoreProduct, updateProduct } = useCatalog();
-    const removedHandles = useCatalog((s) => s.removed);
-    const all = useProducts({ includeHidden: true, includeRemoved: true });
-
+    const { products, token, unauthorized, upsertProduct, loading } = useAdminData();
     const [q, setQ] = useState("");
-    const [category, setCategory] = useState("");
-    const [collection, setCollection] = useState("");
-    const [status, setStatus] = useState("");
     const [min, setMin] = useState("");
     const [max, setMax] = useState("");
-    const [editing, setEditing] = useState<Product | "new" | null>(null);
+    const [showHidden, setShowHidden] = useState(false);
+    const [panel, setPanel] = useState<Panel>(null);
+    const [busyId, setBusyId] = useState<string | null>(null);
+    const [rowError, setRowError] = useState<string | null>(null);
 
-    const sold = useMemo(() => {
-        const m = new Map<string, { qty: number; revenue: number }>();
-        for (const o of orders) {
-            if (!o.paidAt || o.status === "CANCELLED") continue;
-            for (const i of o.items) {
-                const s = m.get(i.handle) ?? { qty: 0, revenue: 0 };
-                s.qty += i.qty; s.revenue += i.price * i.qty;
-                m.set(i.handle, s);
-            }
-        }
-        return m;
-    }, [orders]);
-
-    const rows: Row[] = useMemo(() => all.map((p) => ({
-        ...p, status: removedHandles.includes(p.handle) ? "Removed" : p.hidden ? "Hidden" : "Active",
-        sold: sold.get(p.handle)?.qty ?? 0, revenue: sold.get(p.handle)?.revenue ?? 0,
-    })), [all, removedHandles, sold]);
-
-    const categories = useMemo(() => [...new Set(rows.map((r) => r.category))].sort(), [rows]);
-    const filtered = useMemo(() => rows.filter((p) =>
-        (!category || p.category === category) &&
-        (!collection || p.collections.includes(collection)) &&
-        (status ? p.status === status : p.status !== "Removed") &&
-        (!min || p.price >= Number(min)) && (!max || p.price <= Number(max)) &&
-        (!q.trim() || `${p.title} ${p.category}`.toLowerCase().includes(q.toLowerCase()))), [rows, q, category, collection, status, min, max]);
+    const hiddenCount = products.filter((p) => p.visible === false).length;
+    const filtered = useMemo(() => products.filter((p) =>
+        (showHidden || p.visible !== false)
+        && (!q.trim() || `${p.name} ${p.code} ${p.slug}`.toLowerCase().includes(q.trim().toLowerCase()))
+        && (!min || (p.minPrice ?? 0) >= Number(min)) && (!max || (p.minPrice ?? 0) <= Number(max))), [products, showHidden, q, min, max]);
 
     const { sorted, sort, toggle } = useSort(filtered, {
-        title: (r) => r.title, category: (r) => r.category, price: (r) => r.price, sold: (r) => r.sold, revenue: (r) => r.revenue, status: (r) => r.status,
+        name: (p) => p.name, price: (p) => p.minPrice ?? 0, sold: (p) => p.sold ?? 0, revenue: (p) => p.revenue ?? 0,
     });
-    const paged = usePaged(sorted, JSON.stringify([q, category, collection, status, min, max, sort]));
-    const dirty = !!(q || category || collection || status || min || max);
-    const clear = () => { setQ(""); setCategory(""); setCollection(""); setStatus(""); setMin(""); setMax(""); };
+    const paged = usePaged(sorted, JSON.stringify([showHidden, q, min, max, sort]));
+    const dirty = !!(q || min || max);
+    const clear = () => { setQ(""); setMin(""); setMax(""); };
 
-    const remove = (p: Row) => {
-        const msg = isBaseProduct(p.handle)
-            ? `Remove “${p.title}” from the catalog? You can restore it later from the Removed filter.`
-            : `Delete “${p.title}” permanently?`;
-        if (confirm(msg)) removeProduct(p.handle);
-    };
+    async function toggleVisible(p: AdminProductSummary) {
+        setBusyId(p.id);
+        setRowError(null);
+        try {
+            upsertProduct(await setProductVisible(token, p.id, p.visible === false));
+        } catch (err) {
+            if (err instanceof UnauthorizedError) return unauthorized();
+            setRowError(err instanceof Error ? `${p.name}: ${err.message}` : "That didn’t go through.");
+        } finally {
+            setBusyId(null);
+        }
+    }
+
+    const hasSales = products.some((p) => p.sold !== undefined);
+    const closePanel = () => setPanel(null);
 
     return (
         <>
-            <PageHead title="Products" subtitle={`${rows.filter((r) => r.status !== "Removed").length} products`}>
-                <button className={btnSolid} onClick={() => setEditing("new")}>Add product</button>
+            <PageHead title="Products" subtitle={`${products.length - hiddenCount} live${hiddenCount ? ` · ${hiddenCount} hidden` : ""}`}>
+                <button className={btn} onClick={() => setPanel({ kind: "rates" })}>Exchange rates</button>
+                <button className={btnSolid} onClick={() => setPanel({ kind: "add" })}>Add product</button>
             </PageHead>
+            <DataNotices of={["products"]} />
 
             <div className="mb-5 flex flex-wrap items-end gap-3">
-                <FilterField label="Search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name or category" className={`${inputCls} w-[190px]`} /></FilterField>
-                <FilterField label="Category"><select value={category} onChange={(e) => setCategory(e.target.value)} className={`${inputCls} w-[150px]`}><option value="">All</option>{categories.map((c) => <option key={c} value={c}>{c.replace(/-/g, " ")}</option>)}</select></FilterField>
-                <FilterField label="Collection"><select value={collection} onChange={(e) => setCollection(e.target.value)} className={`${inputCls} w-[200px]`}><option value="">All</option>{COLLECTION_IDS.map((c) => <option key={c} value={c}>{COLLECTION_TITLES[c] ?? c}</option>)}</select></FilterField>
-                <FilterField label="Status"><select value={status} onChange={(e) => setStatus(e.target.value)} className={`${inputCls} w-[120px]`}><option value="">Live</option><option>Active</option><option>Hidden</option><option>Removed</option></select></FilterField>
-                <FilterField label="Price (₵)">
+                <FilterField label="Search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name or code" className={`${inputBare} w-[200px]`} /></FilterField>
+                <FilterField label="From price">
                     <span className="flex items-center gap-1.5">
-                        <input type="number" min={0} value={min} onChange={(e) => setMin(e.target.value)} placeholder="Min" className={`${inputCls} w-[84px]`} />
+                        <input type="number" min={0} value={min} onChange={(e) => setMin(e.target.value)} placeholder="Min" className={`${inputBare} w-[84px]`} />
                         <span className="text-black/30">–</span>
-                        <input type="number" min={0} value={max} onChange={(e) => setMax(e.target.value)} placeholder="Max" className={`${inputCls} w-[84px]`} />
+                        <input type="number" min={0} value={max} onChange={(e) => setMax(e.target.value)} placeholder="Max" className={`${inputBare} w-[84px]`} />
                     </span>
                 </FilterField>
+                <label className="flex items-center gap-2 pb-2 text-[12.5px]"><input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} /> Show hidden{hiddenCount ? ` (${hiddenCount})` : ""}</label>
                 {dirty && <button onClick={clear} className={`${linkBtn} pb-2`}>Clear filters</button>}
             </div>
+            {rowError && <div className="mb-5"><Notice tone="error">{rowError}</Notice></div>}
 
             <Card flush>
                 {sorted.length ? (
                     <>
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[860px]">
+                            <table className="w-full min-w-[820px] border-collapse">
                                 <thead><tr>
-                                    <Th /><SortTh label="Product" k="title" sort={sort} toggle={toggle} /><SortTh label="Category" k="category" sort={sort} toggle={toggle} /><Th>Collections</Th>
-                                    <SortTh label="Price" k="price" sort={sort} toggle={toggle} right /><SortTh label="Sold" k="sold" sort={sort} toggle={toggle} right />
-                                    <SortTh label="Revenue" k="revenue" sort={sort} toggle={toggle} right /><SortTh label="Status" k="status" sort={sort} toggle={toggle} /><Th />
+                                    <SortTh label="Product" k="name" sort={sort} toggle={toggle} /><Th>Status</Th><SortTh label="Price" k="price" sort={sort} toggle={toggle} />
+                                    <SortTh label="Sold" k="sold" sort={sort} toggle={toggle} right /><SortTh label="Revenue" k="revenue" sort={sort} toggle={toggle} right /><Th />
                                 </tr></thead>
-                                <tbody>{paged.rows.map((p) => (
-                                    <tr key={p.handle} className="border-t border-[var(--a-border-soft)]">
-                                        <Td className="w-14"><img src={p.images[0]} alt="" className="h-14 w-10 object-cover" loading="lazy" /></Td>
-                                        <Td>{p.status === "Removed" ? p.title : <Link to={`/products/${p.handle}`} className="hover:underline">{p.title}</Link>}</Td>
-                                        <Td>{p.category.replace(/-/g, " ")}</Td>
-                                        <Td className="text-black/60">{p.collections.map((c) => COLLECTION_TITLES[c] ?? c).join(", ") || "—"}</Td>
-                                        <Td right>{money(p.price)}</Td><Td right>{p.sold}</Td><Td right>{p.revenue ? money(p.revenue) : "—"}</Td>
-                                        <Td><span className={p.status === "Active" ? "" : "text-black/50"}>{p.status}</span></Td>
-                                        <Td right className="whitespace-nowrap">
-                                            {p.status === "Removed" ? <button className={linkBtn} onClick={() => restoreProduct(p.handle)}>Restore</button> : (
-                                                <>
-                                                    <button className={linkBtn} onClick={() => setEditing(p)}>Edit</button>
-                                                    <button className={`${linkBtn} ml-3`} onClick={() => updateProduct(p.handle, { hidden: !p.hidden })}>{p.hidden ? "Show" : "Hide"}</button>
-                                                    <button className={`${linkBtn} ml-3 !text-black/50`} onClick={() => remove(p)}>Remove</button>
-                                                </>
-                                            )}
-                                        </Td>
-                                    </tr>))}</tbody>
+                                <tbody>{paged.rows.map((p) => {
+                                    const status = statusOf(p);
+                                    const muted = status !== "Live" ? "opacity-60" : "";
+                                    return (
+                                        <tr key={p.id} className="border-t border-[var(--a-border-soft)]">
+                                            <Td className={muted}>
+                                                <span className="flex items-center gap-3">
+                                                    {p.imageUrl ? <img src={p.imageUrl} alt="" loading="lazy" className="h-14 w-10 shrink-0 object-cover" /> : <span className="h-14 w-10 shrink-0 bg-[var(--a-subtle)]" />}
+                                                    <span>{p.name}<span className="block text-[12px] text-black/50">{p.code}</span></span>
+                                                </span>
+                                            </Td>
+                                            <Td><StatePill label={status} color={STATUS_COLOR[status]} /></Td>
+                                            <Td className={muted}>
+                                                {p.prices.length ? p.prices.map((row) => (
+                                                    <span key={row.label} className="block">{formatMoney(row.price, p.currency)}{p.prices.length > 1 && <span className="text-black/50"> · {row.label}</span>}</span>
+                                                )) : "—"}
+                                                {!!p.currencyPrices?.length && <span className="block text-[11px] text-black/45">also {p.currencyPrices.map((c) => c.currency).join(", ")}</span>}
+                                            </Td>
+                                            <Td right className={muted}>{p.sold ?? "—"}</Td><Td right className={muted}><Revenue p={p} /></Td>
+                                            <Td right>
+                                                <span className="inline-flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
+                                                    <button className={linkBtn} onClick={() => setPanel({ kind: "view", product: p })}>View</button>
+                                                    <button className={linkBtn} disabled={!p.prices.length || p.status === "ARCHIVED"} onClick={() => setPanel({ kind: "prices", product: p })}>Edit prices</button>
+                                                    <button className={linkBtn} disabled={busyId === p.id || (status !== "Live" && !p.prices.length)} onClick={() => void toggleVisible(p)}>{busyId === p.id ? "…" : status === "Live" ? "Hide" : "Show"}</button>
+                                                    {p.status !== "ARCHIVED" && <button className={linkBtn} onClick={() => setPanel({ kind: "archive", product: p })}>Archive</button>}
+                                                </span>
+                                            </Td>
+                                        </tr>
+                                    );
+                                })}</tbody>
                             </table>
                         </div>
                         <Pagination p={paged} />
                     </>
-                ) : <Empty>No products match. {dirty && <button onClick={clear} className={linkBtn}>Clear filters</button>}</Empty>}
+                ) : <Empty>{loading ? "Loading…" : products.length ? <>No products match. {dirty && <button onClick={clear} className={linkBtn}>Clear filters</button>}</> : "No products."}</Empty>}
             </Card>
-            <p className="mt-3 text-[11.5px] text-black/40">Changes show on the storefront in this browser. They’re saved here until the backend is connected.</p>
+            {hasSales && <p className="m-0 mt-3 text-[11px] text-black/40">Sold and revenue count lines on paid orders for each product. Unpaid, cancelled and fully refunded orders count for nothing.</p>}
 
-            <Drawer open={editing !== null} onClose={() => setEditing(null)} title={editing === "new" ? "Add product" : "Edit product"}>
-                {editing !== null && <ProductForm key={editing === "new" ? "new" : editing.handle} product={editing === "new" ? undefined : editing} all={all} onDone={() => setEditing(null)} />}
+            <Drawer wide open={panel?.kind === "view"} onClose={closePanel} title={panel?.kind === "view" ? panel.product.name : "Product"}>
+                {panel?.kind === "view" && <ProductDrawerBody key={panel.product.id} product={panel.product} />}
+            </Drawer>
+            <Drawer wide open={panel?.kind === "prices"} onClose={closePanel} title={panel?.kind === "prices" ? `Prices: ${panel.product.name}` : "Prices"}>
+                {panel?.kind === "prices" && <PricesPanel key={panel.product.id} product={panel.product} onDone={closePanel} />}
+            </Drawer>
+            <Drawer open={panel?.kind === "rates"} onClose={closePanel} title="Exchange rates">
+                {panel?.kind === "rates" && <ExchangeRates />}
+            </Drawer>
+            <Drawer open={panel?.kind === "archive"} onClose={closePanel} title="Archive product">
+                {panel?.kind === "archive" && <ArchivePanel key={panel.product.id} product={panel.product} onDone={closePanel} />}
+            </Drawer>
+            <Drawer open={panel?.kind === "add"} onClose={closePanel} title="Add product">
+                {panel?.kind === "add" && <AddProduct onClose={closePanel} onCreated={() => setShowHidden(true)} />}
             </Drawer>
         </>
     );

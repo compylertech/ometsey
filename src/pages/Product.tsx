@@ -1,7 +1,8 @@
 import { useState } from "react"
 import { Link, useParams } from "react-router-dom"
-import { SIZES, money } from "@/data/catalog"
+import { SIZES } from "@/data/catalog"
 import { useProducts } from "@/store/catalog"
+import { useMoney } from "@/store/market"
 import { ProductCard } from "@/components/ProductCard"
 import { useCart } from "@/store/cart"
 import { useWishlist } from "@/store/wishlist"
@@ -10,6 +11,7 @@ import { useWishlist } from "@/store/wishlist"
 export function Product() {
     const { handle } = useParams();
     const products = useProducts();
+    const { fmtProduct } = useMoney();
     const product = products.find((p) => p.handle === handle);
     const [size, setSize] = useState("");
     const add = useCart((s) => s.add);
@@ -28,7 +30,7 @@ export function Product() {
                 </div>
                 <div className="lg:sticky lg:top-28 lg:self-start">
                     <h1 className="label text-sm">{product.title}</h1>
-                    <p className="mt-3">{money(product.price)}</p>
+                    <p className="mt-3">{fmtProduct(product)}</p>
                     <p className="mt-6 text-sm leading-6 text-black/70">{product.description}</p>
                     <p className="label mb-3 mt-8">Size</p>
                     <div className="flex flex-wrap gap-2">

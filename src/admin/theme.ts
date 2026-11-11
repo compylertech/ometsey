@@ -1,11 +1,12 @@
-import { create } from "zustand"
-import { persist } from "zustand/middleware"
+// global imports
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export type AdminTheme = "mono" | "brand";
 
 export const THEMES: { id: AdminTheme; label: string; note: string }[] = [
     { id: "mono", label: "Black & white", note: "Plain monochrome. The default." },
-    { id: "brand", label: "Ometsey brown", note: "Warm brown accents from the storefront." },
+    { id: "brand", label: "Ometsey brown", note: "Brown and cream, from the storefront palette." },
 ];
 
 /** Applies to the admin only; the storefront is unaffected. */

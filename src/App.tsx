@@ -3,6 +3,8 @@ import { Route, Routes, useLocation } from "react-router-dom"
 import { Header } from "@/components/Header"
 import { Footer } from "@/components/Footer"
 import { CartDrawer } from "@/components/CartDrawer"
+import { useMoney } from "@/store/market"
+import { useShop } from "@/store/shop"
 import { Home } from "@/pages/Home"
 import { Collection } from "@/pages/Collection"
 import { Product } from "@/pages/Product"
@@ -19,6 +21,8 @@ import { Account } from "@/pages/Account"
 import { Wishlist } from "@/pages/Wishlist"
 import { Blog } from "@/pages/Blog"
 import { Cart } from "@/pages/Cart"
+import { Checkout } from "@/pages/Checkout"
+import { OrderStatus } from "@/pages/OrderStatus"
 import AdminApp from "@/admin/AdminApp"
 
 function ScrollToTop() {
@@ -26,6 +30,16 @@ function ScrollToTop() {
     useEffect(() => {
         window.scrollTo(0, 0);
     }, [pathname]);
+    return null;
+}
+
+/** Loads the catalog in the visitor's currency, and again whenever they switch it. */
+function ShopLoader() {
+    const { currency } = useMoney();
+    const load = useShop((s) => s.load);
+    const loadCollections = useShop((s) => s.loadCollections);
+    useEffect(() => { void load(currency); }, [currency, load]);
+    useEffect(() => { void loadCollections(); }, [loadCollections]);
     return null;
 }
 
@@ -39,6 +53,7 @@ export default function App() {
     return (
         <>
             <ScrollToTop />
+            <ShopLoader />
             {!bare && <Header />}
             <main>
                 <Routes>
@@ -46,6 +61,8 @@ export default function App() {
                     <Route path="/collections/:handle" element={<Collection />} />
                     <Route path="/products/:handle" element={<Product />} />
                     <Route path="/cart" element={<Cart />} />
+                    <Route path="/checkout" element={<Checkout />} />
+                    <Route path="/order-status" element={<OrderStatus />} />
                     <Route path="/pages/about-us" element={<About />} />
                     <Route path="/pages/faq" element={<Faq />} />
                     <Route path="/pages/contact-us" element={<Contact />} />

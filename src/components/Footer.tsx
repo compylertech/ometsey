@@ -1,9 +1,20 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { CATEGORIES, FOOTER_GROUPS, STORE } from "@/data/catalog"
+import { FOOTER_GROUPS, STORE } from "@/data/catalog"
+import { useMenu } from "@/lib/menu"
 
 export function Footer() {
     const [sent, setSent] = useState(false);
+    const menu = useMenu();
+    // The Shopping column lists the live collections, after the two fixed links and before Track Your Order.
+    const groups = FOOTER_GROUPS.map((g) => g.heading !== "Shopping" ? g : {
+        ...g,
+        links: [
+            ...g.links.filter((l) => l.to === "/collections/all" || l.to === "/collections/new-in"),
+            ...menu.collections.slice(0, 3),
+            ...g.links.filter((l) => !l.to.startsWith("/collections/")),
+        ],
+    });
     return (
         <footer className="bg-paper">
             <section className="px-5 py-16 text-center lg:px-6">
@@ -16,13 +27,17 @@ export function Footer() {
             <section className="border-t border-line px-5 py-12 text-center lg:px-6">
                 <h4 className="label-wide mb-6">Shop by category</h4>
                 <ul className="flex flex-wrap justify-center gap-x-8 gap-y-3">
-                    {CATEGORIES.map((c) => <li key={c.to}><Link to={c.to} className="label hover:underline">{c.label}</Link></li>)}
+                    {menu.categories.map((c) => (
+                        <li key={c.to}>{c.soon
+                            ? <span title="Coming soon" className="label text-black/35">{c.label}</span>
+                            : <Link to={c.to} className="label hover:underline">{c.label}</Link>}</li>
+                    ))}
                 </ul>
             </section>
 
             <section className="grid gap-12 border-t border-line px-5 py-14 lg:grid-cols-[2fr_1fr] lg:px-6">
                 <div className="grid gap-10 sm:grid-cols-3">
-                    {FOOTER_GROUPS.map((g) => (
+                    {groups.map((g) => (
                         <div key={g.heading}>
                             <h4 className="label-wide mb-5">{g.heading}</h4>
                             <ul>{g.links.map((l) => <li key={l.label}><Link to={l.to} className="label block py-1.5 text-black/70 hover:text-black">{l.label}</Link></li>)}</ul>

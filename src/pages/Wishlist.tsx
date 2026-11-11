@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom"
 import { PageShell } from "@/components/Form"
 import { ProductCard } from "@/components/ProductCard"
-import { useProducts } from "@/store/catalog"
+import { useProducts } from "@/store/shop"
 import { useWishlist } from "@/store/wishlist"
 
 export function Wishlist() {

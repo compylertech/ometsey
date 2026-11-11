@@ -21,6 +21,9 @@ export const useMarket = create<MarketState>()(persist((set) => ({
     setRate: (rate) => set({ rate }),
 }), { name: "ometsey-market" }));
 
+type PricedProduct = Pick<Product, "price" | "prices" | "currency">;
+const asCurrency = (c: string): Currency => (c === "USD" ? "USD" : "GHS");
+
 /** Everything a component needs to show prices: the active currency and formatters for it. */
 export function useMoney() {
     const chosen = useMarket((s) => s.chosen);
@@ -31,11 +34,11 @@ export function useMoney() {
 
     return useMemo(() => ({
         currency, detected, country, rate,
-        /** A product's price as a number in the active currency. */
-        priceOf: (p: Pick<Product, "price" | "prices">) => priceFor(p, currency, rate),
-        /** A product's price, formatted. */
-        fmtProduct: (p: Pick<Product, "price" | "prices">) => formatMoney(priceFor(p, currency, rate), currency),
-        /** An amount already in the active currency, formatted. */
-        fmt: (amount: number) => formatMoney(amount, currency),
+        /** A product's price as a number. A product from the backend is already priced in its own currency. */
+        priceOf: (p: PricedProduct) => (p.currency ? p.price : priceFor(p, currency, rate)),
+        /** A product's price, formatted in whatever currency it is actually priced in. */
+        fmtProduct: (p: PricedProduct) => (p.currency ? formatMoney(p.price, asCurrency(p.currency)) : formatMoney(priceFor(p, currency, rate), currency)),
+        /** An amount formatted in the active currency, or in `as` when the amounts came from products priced in another. */
+        fmt: (amount: number, as?: string) => formatMoney(amount, as ? asCurrency(as) : currency),
     }), [currency, detected, country, rate, chosen]);
 }

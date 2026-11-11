@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { PageShell } from "@/components/Form"
 import { BEST_SELLERS, COLLECTION_TILES, HERO_SLIDES } from "@/data/catalog"
-import { useProducts } from "@/store/catalog"
+import { useProducts } from "@/store/shop"
 
 /** Every campaign and product photograph we hold. The live Gallery page is empty, so this stands in for it. */
 const CAMPAIGN = [...HERO_SLIDES, ...COLLECTION_TILES.map((t) => t.image), ...BEST_SELLERS.map((t) => t.image)];

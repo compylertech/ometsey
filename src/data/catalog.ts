@@ -92,8 +92,12 @@ export const HOURS = [
 export interface Product {
     handle: string;
     title: string;
-    /** Price in Ghana cedis, as listed on ometsey.com. */
+    /** Price in Ghana cedis, as listed on ometsey.com. A product from the backend is priced in `currency` instead. */
     price: number;
+    /** Set on products read from the backend: the currency `price` is already in. */
+    currency?: string;
+    /** Sizes the backend lists as sold. */
+    sizes?: string[];
     /** WooCommerce product-category slug. */
     category: string;
     tags: string[];

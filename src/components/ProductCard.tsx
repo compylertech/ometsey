@@ -10,7 +10,7 @@ export function ProductCard({ product }: { product: Product }) {
     return (
         <article>
             <Link to={`/products/${product.handle}`} onMouseEnter={() => setI(1)} onMouseLeave={() => setI(0)}>
-                <img src={product.images[i]} alt={product.title} loading="lazy" className="aspect-[5/7] w-full object-cover" />
+                <img src={product.images[i] ?? product.images[0]} alt={product.title} loading="lazy" className="aspect-[5/7] w-full object-cover" />
             </Link>
             <Link to={`/products/${product.handle}`} className="mt-4 block">
                 <h3 className="text-[13px] font-normal uppercase tracking-[0.03em]">{product.title}</h3>

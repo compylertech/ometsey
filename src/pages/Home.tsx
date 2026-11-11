@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 import { BEST_SELLERS, COLLECTION_TILES, HERO_SLIDES } from "@/data/catalog"
-import { useProducts } from "@/store/catalog"
+import { useProducts } from "@/store/shop"
 import { ProductCard } from "@/components/ProductCard"
 
 function Hero() {

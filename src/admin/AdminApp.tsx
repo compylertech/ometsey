@@ -52,7 +52,7 @@ function LoginPanel({ onSignedIn }: { onSignedIn: (s: AdminSession) => void }) {
         <div className="grid min-h-screen place-items-center bg-[var(--a-side)] px-6">
             <form onSubmit={submit} noValidate className="w-full max-w-sm space-y-4 bg-[var(--a-surface-alt)] p-8">
                 <div className="text-center">
-                    <img src={BRAND.logo} alt={BRAND.name} className="mx-auto h-12 w-auto" />
+                    <img src={BRAND.logo} alt={BRAND.name} className="mx-auto h-12 w-auto" style={{ filter: "var(--a-logo-on-light)" }} />
                     <p className="m-0 mt-1 text-[11px] uppercase tracking-[0.2em] text-black/45">Admin Portal</p>
                 </div>
                 <p className="m-0 text-center text-[13px] text-black/55">Sign in with your administrator account.</p>
@@ -104,8 +104,12 @@ export default function AdminApp() {
                         <aside className="bg-[var(--a-side)] text-white md:sticky md:top-0 md:flex md:h-screen md:flex-col md:overflow-hidden">
                             <div className={`flex items-center justify-between px-5 pt-5 md:block md:pt-7 ${collapsed ? "md:flex md:justify-center md:px-0" : ""}`}>
                                 <Link to={ADMIN} aria-label={`${BRAND.name} Admin`} className="flex items-center gap-3">
-                                    <span className={`text-[17px] font-semibold uppercase tracking-[0.18em] ${hide}`}>{BRAND.name}</span>
-                                    {collapsed && <span className="hidden text-[17px] font-semibold md:block">{BRAND.name[0]}</span>}
+                                    <img src={BRAND.logo} alt={BRAND.name} className={`h-10 w-auto md:h-11 ${hide}`} style={{ filter: "var(--a-logo-on-dark)" }} />
+                                    {collapsed && (
+                                        <span className="hidden h-9 w-9 overflow-hidden md:block">
+                                            <img src={BRAND.logo} alt={BRAND.name} className="h-9 max-w-none" style={{ filter: "var(--a-logo-on-dark)" }} />
+                                        </span>
+                                    )}
                                 </Link>
                                 <p className={`m-0 text-[11px] uppercase tracking-[0.2em] text-white/40 md:mt-1 ${hide}`}>Admin</p>
                             </div>

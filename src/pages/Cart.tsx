@@ -1,7 +1,6 @@
-import { useState } from "react"
 import { Link } from "react-router-dom"
 import { PageShell } from "@/components/Form"
-import { useProducts } from "@/store/catalog"
+import { useProducts } from "@/store/shop"
 import { useMoney } from "@/store/market"
 import { useCart } from "@/store/cart"
 
@@ -9,7 +8,6 @@ export function Cart() {
     const { lines, setQty, remove } = useCart();
     const products = useProducts();
     const { fmt, fmtProduct, priceOf } = useMoney();
-    const [notice, setNotice] = useState(false);
     const rows = lines.flatMap((l) => {
         const product = products.find((p) => p.handle === l.handle);
         return product ? [{ ...l, product }] : [];
@@ -49,15 +47,14 @@ export function Cart() {
                                     <button onClick={() => remove(r.handle, r.size)} className="border-b border-black text-[12px]">Remove</button>
                                 </div>
                             </div>
-                            <p className="text-[13px]">{fmt(priceOf(r.product) * r.qty)}</p>
+                            <p className="text-[13px]">{fmt(priceOf(r.product) * r.qty, r.product.currency)}</p>
                         </div>
                     ))}
                 </div>
                 <aside className="h-fit border border-line p-6">
-                    <div className="flex justify-between text-[14px] uppercase"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
+                    <div className="flex justify-between text-[14px] uppercase"><span>Subtotal</span><span>{fmt(subtotal, rows[0]?.product.currency)}</span></div>
                     <p className="mt-3 text-[12px] text-black/60">Worldwide shipping. Taxes and shipping are calculated at checkout.</p>
-                    <button onClick={() => setNotice(true)} className="btn-black mt-6 w-full">Checkout</button>
-                    {notice && <p className="mt-3 text-[12px] leading-5 text-black/60">Checkout isn’t connected to payments yet.</p>}
+                    <Link to="/checkout" className="btn-black mt-6 block w-full text-center">Checkout</Link>
                     <Link to="/collections/all" className="label ulink mt-6 inline-block">Continue shopping</Link>
                 </aside>
             </div>

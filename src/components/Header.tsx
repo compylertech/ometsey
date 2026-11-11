@@ -1,7 +1,8 @@
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { ACCOUNT_LINKS, NAV, PROMO } from "@/data/catalog"
-import { useProducts } from "@/store/catalog"
+import { useMenu } from "@/lib/menu"
+import { useProducts } from "@/store/shop"
 import { useMoney } from "@/store/market"
 import { CurrencySelect } from "./CurrencySelect"
 import { useCart } from "@/store/cart"
@@ -20,13 +21,15 @@ function Announcement() {
 
 /** The reference shows no inline nav at any width: everything lives in this left drawer. */
 function MenuDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+    const menu = useMenu();
+    const items = NAV.map((i) => (i.label === "Collections" ? { ...i, links: menu.collections } : i));
     return (
         <>
             <div onClick={onClose} className={`fixed inset-0 z-50 bg-black/40 transition ${open ? "visible opacity-100" : "invisible opacity-0"}`} />
             <aside className={`fixed left-0 top-0 z-50 flex h-full w-full max-w-[420px] flex-col overflow-y-auto bg-paper px-8 py-6 transition-transform duration-300 ${open ? "translate-x-0" : "-translate-x-full"}`}>
                 <button aria-label="Close menu" onClick={onClose} className="mb-8"><CloseIcon /></button>
                 <ul>
-                    {NAV.map((item) => (
+                    {items.map((item) => (
                         <li key={item.label} className="border-b border-line py-4">
                             <Link to={item.to} onClick={onClose} className="label">{item.label}</Link>
                             {item.links?.map((l) => (

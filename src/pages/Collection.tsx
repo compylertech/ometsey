@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link, useParams, useSearchParams } from "react-router-dom"
-import { CATEGORIES, COLLECTION_TITLES, COLOR_SWATCH, SIZES, colorOf, productsFor } from "@/data/catalog"
+import { COLOR_SWATCH, SIZES, colorOf, productsFor } from "@/data/catalog"
 import { CURRENCIES } from "@/lib/money"
-import { useProducts } from "@/store/catalog"
+import { useMenu } from "@/lib/menu"
+import { useProducts } from "@/store/shop"
 import { useMoney } from "@/store/market"
 import { ProductCard } from "@/components/ProductCard"
 import { CloseIcon } from "@/components/Icons"
@@ -46,6 +47,7 @@ export function Collection() {
 
 function CollectionPage({ handle }: { handle: string }) {
     const catalog = useProducts();
+    const menu = useMenu();
     const base = useMemo(() => productsFor(catalog, handle), [catalog, handle]);
     const { priceOf, currency } = useMoney();
     const prices = base.map((p) => priceOf(p));
@@ -103,12 +105,14 @@ function CollectionPage({ handle }: { handle: string }) {
 
     return (
         <section className="px-5 pb-16 pt-6 lg:px-6">
-            <h1 className="text-[18px] font-normal">{handle === "all" ? "All Products" : COLLECTION_TITLES[handle] ?? handle.replace(/-/g, " ")}</h1>
+            <h1 className="text-[18px] font-normal">{handle === "all" ? "All Products" : menu.titles[handle] ?? handle.replace(/-/g, " ")}</h1>
 
             {/* Category pills */}
             <div className="rail mt-9 flex gap-4 overflow-x-auto pb-1">
                 <Link to="/collections/all" className={`shrink-0 border px-5 py-[8.5px] text-[12.5px] ${handle === "all" ? "border-black" : "border-black/25"}`}>All Products</Link>
-                {CATEGORIES.map((c) => (
+                {menu.categories.map((c) => c.soon ? (
+                    <span key={c.to} title="Coming soon" className="shrink-0 cursor-default border border-black/10 px-5 py-[8.5px] text-[12.5px] text-black/35">{c.label}</span>
+                ) : (
                     <Link key={c.to} to={c.to} className={`shrink-0 border px-5 py-[8.5px] text-[12.5px] ${c.to.endsWith(`/${handle}`) ? "border-black" : "border-black/25"}`}>{c.label}</Link>
                 ))}
             </div>

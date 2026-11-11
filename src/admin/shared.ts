@@ -1,5 +1,5 @@
 import { API_BASE_URL, BRAND } from "./brand";
-import type { Quote, QuoteRequest, StorefrontProduct } from "./storefront-types";
+import type { Quote, QuoteRequest, StorefrontProduct } from "@/lib/storefront-types";
 
 /**
  * Currency formatting. Falls back to a plain code-prefixed amount if the runtime rejects the

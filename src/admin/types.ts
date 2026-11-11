@@ -1,4 +1,4 @@
-import type { CheckoutRequest } from "./storefront-types";
+import type { CheckoutRequest } from "@/lib/storefront-types";
 
 export interface AdminSession {
     token: string;

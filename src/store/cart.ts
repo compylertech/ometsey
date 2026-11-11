@@ -10,6 +10,7 @@ interface CartState {
     remove: (handle: string, size: string) => void;
     setQty: (handle: string, size: string, qty: number) => void;
     setOpen: (open: boolean) => void;
+    clear: () => void;
 }
 
 export const useCart = create<CartState>()(persist((set) => ({
@@ -29,4 +30,5 @@ export const useCart = create<CartState>()(persist((set) => ({
             : s.lines.map((l) => (l.handle === handle && l.size === size ? { ...l, qty } : l)),
     })),
     setOpen: (open) => set({ open }),
+    clear: () => set({ lines: [] }),
 }), { name: "ometsey-cart", partialize: (s) => ({ lines: s.lines }) }))

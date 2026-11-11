@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // local imports
 import { fetchProduct, fetchQuote } from "../shared";
 import { formatMoney } from "../shared";
-import type { Quote, StorefrontVariant } from "../storefront-types";
+import type { Quote, StorefrontVariant } from "@/lib/storefront-types";
 import { createManualOrder, UnauthorizedError } from "../api";
 import { useAdminData } from "../data";
 import { Notice, btn, btnSolid, inputCls } from "../ui";
